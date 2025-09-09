@@ -278,5 +278,21 @@
         "seat_number": "",
         "sequence_number": 999,
         "source_file": "Manual Entry"
+    },
+    {
+        "cabin": "Economy",
+        "carrier": "CA",
+        "confirmation_number": "",
+        "departure_date": "2019-07-02",
+        "destination": "ULN",
+        "eticket_indicator": "E",
+        "flight_number": "955",
+        "is_skiplagged": false,
+        "julian_date": "000",
+        "origin": "PEK",
+        "passenger_name": "LIVINGSTON/KENTARO",
+        "seat_number": "",
+        "sequence_number": 999,
+        "source_file": "Manual Entry"
     }
 ]
