@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .leaflet-container { background: #374151; } /* Dark grey for map background */
+        .leaflet-tooltip { background-color: rgba(31, 41, 55, 0.8); color: white; border: 1px solid #4b5563; box-shadow: none; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 antialiased">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-white tracking-tight">Flight Dashboard</h1>
+            <p class="text-gray-400 mt-1">An overview of all scanned boarding passes.</p>
+        </header>
+
+        <main>
+            <!-- Map Section -->
+            <section id="map-section" class="mb-8">
+                <h2 class="text-2xl font-semibold text-white mb-4">Flight Map</h2>
+                <div id="flightMap" class="w-full h-96 md:h-[500px] bg-gray-700 rounded-lg shadow-lg"></div>
+            </section>
+
+            <!-- Table Section -->
+            <section id="table-section">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-white">All Flights</h2>
+                    <button onclick="openAddTripModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add Trip Manually</button>
+                </div>
+                <div class="bg-gray-800 rounded-lg shadow-lg overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Flight</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Route</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden md:table-cell">Seat</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden sm:table-cell">Confirmation</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-gray-800 divide-y divide-gray-700">
+                            {% for flight in flights %}
+                            <tr id="flight-row-{{ flight.id }}" class="hover:bg-gray-700/50 transition-colors duration-200 {% if flight.is_skiplagged %} text-gray-500 opacity-60 {% endif %}">
+                                <td class="px-6 py-4 whitespace-nowrap">{{ flight.departure_date }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="font-medium text-white">{{ flight.carrier }} {{ flight.flight_number }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <span class="font-mono bg-gray-700 text-gray-200 px-2 py-1 rounded-md">{{ flight.origin }}</span>
+                                        <span class="mx-2 text-gray-500">→</span>
+                                        <span class="font-mono bg-gray-700 text-gray-200 px-2 py-1 rounded-md">{{ flight.destination }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">{{ flight.seat_number }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell font-mono">{{ flight.confirmation_number }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right">
+                                    <button onclick="openModal('{{ flight.id }}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Details</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="details-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300" onclick="closeModal()">
+        <div id="details-modal" class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0" onclick="event.stopPropagation()">
+            <!-- Modal content will be injected here -->
+        </div>
+    </div>
+    
+    <!-- Manual Add Trip Modal -->
+    <div id="add-trip-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300" onclick="closeAddTripModal()">
+        <div id="add-trip-modal" class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0" onclick="event.stopPropagation()">
+            <form id="add-trip-form" onsubmit="handleAddTripSubmit(event)" class="p-6">
+                <div class="flex justify-between items-start mb-6">
+                    <h3 class="text-2xl font-bold text-white">Add a New Trip</h3>
+                    <button type="button" onclick="closeAddTripModal()" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="passenger_name" class="block text-sm font-medium text-gray-300">Passenger Name</label>
+                            <input type="text" name="passenger_name" value="LIVINGSTON/LIAM" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="confirmation_number" class="block text-sm font-medium text-gray-300">Confirmation #</label>
+                            <input type="text" name="confirmation_number" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="7" style="text-transform:uppercase">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                            <label for="departure_date" class="block text-sm font-medium text-gray-300">Departure Date</label>
+                            <input type="date" name="departure_date" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                         <div>
+                            <label for="carrier" class="block text-sm font-medium text-gray-300">Airline (IATA)</label>
+                            <input type="text" name="carrier" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="2" style="text-transform:uppercase">
+                        </div>
+                    </div>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="flight_number" class="block text-sm font-medium text-gray-300">Flight Number</label>
+                            <input type="text" name="flight_number" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="seat_number" class="block text-sm font-medium text-gray-300">Seat</label>
+                            <input type="text" name="seat_number" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" style="text-transform:uppercase">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="origin" class="block text-sm font-medium text-gray-300">Origin (IATA)</label>
+                            <input type="text" name="origin" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="3" style="text-transform:uppercase">
+                        </div>
+                        <div>
+                            <label for="destination" class="block text-sm font-medium text-gray-300">Destination (IATA)</label>
+                            <input type="text" name="destination" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="3" style="text-transform:uppercase">
+                        </div>
+                    </div>
+                     <div>
+                        <label for="cabin" class="block text-sm font-medium text-gray-300">Cabin</label>
+                        <select name="cabin" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option>Economy</option>
+                            <option>Premium Economy</option>
+                            <option>Business</option>
+                            <option>First</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6 pt-4 border-t border-gray-700 flex justify-end">
+                    <button type="button" onclick="closeAddTripModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 mr-2">Cancel</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add Flight</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script>
+        const flightsData = {{ flights|tojson }};
+        let map;
+        let flightLayers = [];
+
+        // --- Great Circle Calculation ---
+        function getGreatCircleArc(startCoords, endCoords, numPoints = 100) {
+            const [startLat, startLon] = startCoords;
+            const [endLat, endLon] = endCoords;
+
+            const toRadians = deg => deg * Math.PI / 180;
+            const toDegrees = rad => rad * 180 / Math.PI;
+
+            const lat1 = toRadians(startLat);
+            const lon1 = toRadians(startLon);
+            const lat2 = toRadians(endLat);
+            const lon2 = toRadians(endLon);
+
+            // Calculate the angular distance between the two points
+            const d = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin((lat1 - lat2) / 2), 2) +
+                Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon1 - lon2) / 2), 2)));
+
+            if (Math.abs(d) < 1e-6) return [[startCoords, endCoords]]; // If points are very close, return a straight line
+
+            const points = [];
+            for (let i = 0; i <= numPoints; i++) {
+                const f = i / numPoints;
+                const A = Math.sin((1 - f) * d) / Math.sin(d);
+                const B = Math.sin(f * d) / Math.sin(d);
+                const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+                const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+                const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+                const lat = Math.atan2(z, Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)));
+                const lon = Math.atan2(y, x);
+                points.push([toDegrees(lat), toDegrees(lon)]);
+            }
+
+            // Handle antimeridian crossing by splitting the line
+            const lines = [];
+            let currentLine = [];
+            for (let i = 0; i < points.length; i++) {
+                currentLine.push(points[i]);
+                if (i > 0 && Math.abs(points[i][1] - points[i - 1][1]) > 180) {
+                    const lastPoint = points[i - 1];
+                    const thisPoint = points[i];
+                    // Find where the line would cross the antimeridian and split it
+                    const lonDiff = thisPoint[1] - lastPoint[1];
+                    const direction = lonDiff > 0 ? -1 : 1;
+                    const lonEdge = 180 * direction;
+                    const latAtEdge = lastPoint[0] + (lonEdge - lastPoint[1]) * (thisPoint[0] - lastPoint[0]) / lonDiff;
+                    
+                    currentLine[currentLine.length - 1] = [latAtEdge, lonEdge];
+                    lines.push(currentLine);
+                    currentLine = [[latAtEdge, -lonEdge], thisPoint];
+                }
+            }
+            lines.push(currentLine);
+            return lines;
+        }
+
+
+        // --- Map Initialization and Drawing ---
+        function initializeMap() {
+            map = L.map('flightMap').setView([20, 0], 2);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+            drawFlightsOnMap();
+        }
+
+        function drawFlightsOnMap() {
+            flightLayers.forEach(layer => map.removeLayer(layer));
+            flightLayers = [];
+            const visibleFlights = flightsData.filter(f => !f.is_skiplagged);
+
+            visibleFlights.forEach(flight => {
+                if (flight.origin_coords && flight.dest_coords) {
+                    const flightPaths = getGreatCircleArc(flight.origin_coords, flight.dest_coords);
+                    const tooltipContent = `<b>${flight.carrier} ${flight.flight_number}</b><br>${flight.origin} → ${flight.destination}`;
+
+                    flightPaths.forEach(path => {
+                         const polyline = L.polyline(path, { color: '#2563EB', weight: 2, opacity: 0.7 }).addTo(map);
+                         polyline.bindTooltip(tooltipContent, { sticky: true });
+                         flightLayers.push(polyline);
+                    });
+                }
+            });
+        }
+
+        // --- Details Modal ---
+        function openModal(flightId) {
+            const flight = flightsData.find(f => f.id === flightId);
+            if (!flight) return;
+            const modalContent = `
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-2xl font-bold text-white">${flight.carrier} ${flight.flight_number}</h3>
+                            <p class="text-gray-400">${flight.origin} to ${flight.destination}</p>
+                        </div>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-sm text-gray-300">
+                        <div><strong>Date:</strong> ${flight.departure_date}</div>
+                        <div><strong>Seat:</strong> ${flight.seat_number}</div>
+                        <div><strong>Cabin:</strong> ${flight.cabin}</div>
+                        <div><strong>Sequence:</strong> ${flight.sequence_number}</div>
+                        <div class="col-span-2"><strong>Confirmation:</strong> <span class="font-mono">${flight.confirmation_number}</span></div>
+                        ${flight.ticket_number ? `<div class="col-span-2"><strong>Ticket Number:</strong> <span class="font-mono">${flight.ticket_number}</span></div>` : ''}
+                        ${flight.frequent_flyer_number ? `<div class="col-span-2"><strong>Frequent Flyer:</strong> ${flight.frequent_flyer_airline} - ${flight.frequent_flyer_number}</div>` : ''}
+                        <div class="col-span-2"><strong>Source File:</strong> ${flight.source_file}</div>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-gray-700 flex justify-end">
+                        <button id="skiplag-btn-${flight.id}" onclick="toggleSkiplagStatus('${flight.id}')" 
+                                class="${flight.is_skiplagged ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-red-600 hover:bg-red-700'} text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                            ${flight.is_skiplagged ? 'Mark as Not Skiplagged' : 'Mark as Skiplagged'}
+                        </button>
+                    </div>
+                </div>
+            `;
+            const modal = document.getElementById('details-modal');
+            const backdrop = document.getElementById('details-modal-backdrop');
+            modal.innerHTML = modalContent;
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                modal.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('details-modal');
+            const backdrop = document.getElementById('details-modal-backdrop');
+            backdrop.classList.remove('opacity-100');
+            modal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex');
+            }, 300);
+        }
+
+        // --- Add Trip Modal ---
+        function openAddTripModal() {
+            const backdrop = document.getElementById('add-trip-modal-backdrop');
+            const modal = document.getElementById('add-trip-modal');
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                modal.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeAddTripModal() {
+            const backdrop = document.getElementById('add-trip-modal-backdrop');
+            const modal = document.getElementById('add-trip-modal');
+            backdrop.classList.remove('opacity-100');
+            modal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex');
+                document.getElementById('add-trip-form').reset();
+            }, 300);
+        }
+
+        async function handleAddTripSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const flightData = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('/api/add_flight', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(flightData)
+                });
+
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.error || 'Failed to add flight');
+                }
+                closeAddTripModal();
+                window.location.reload(); // Reload to see the new flight
+            } catch (error) {
+                console.error('Error adding flight:', error);
+                alert(`Could not add flight: ${error.message}`);
+            }
+        }
+
+        // --- API Call for Skiplagging ---
+        async function toggleSkiplagStatus(flightId) {
+            try {
+                const response = await fetch('/api/toggle_skiplag', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: flightId })
+                });
+
+                if (!response.ok) throw new Error('Failed to update flight status');
+                const result = await response.json();
+                if (result.success) {
+                    const flight = flightsData.find(f => f.id === flightId);
+                    flight.is_skiplagged = result.new_status;
+                    updateFlightRowUI(flightId, result.new_status);
+                    updateSkiplagButtonUI(flightId, result.new_status);
+                    drawFlightsOnMap();
+                }
+            } catch (error) {
+                console.error('Error toggling skiplag status:', error);
+                alert('Could not update flight status. Please check the console.');
+            }
+        }
+
+        function updateFlightRowUI(flightId, isSkiplagged) {
+            const row = document.getElementById(`flight-row-${flightId}`);
+            if (row) {
+                if (isSkiplagged) {
+                    row.classList.add('text-gray-500', 'opacity-60');
+                } else {
+                    row.classList.remove('text-gray-500', 'opacity-60');
+                }
+            }
+        }
+        
+        function updateSkiplagButtonUI(flightId, isSkiplagged) {
+             const button = document.getElementById(`skiplag-btn-${flightId}`);
+             if(button) {
+                button.textContent = isSkiplagged ? 'Mark as Not Skiplagged' : 'Mark as Skiplagged';
+                if(isSkiplagged) {
+                    button.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    button.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+                } else {
+                    button.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+                    button.classList.add('bg-red-600', 'hover:bg-red-700');
+                }
+             }
+        }
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMap();
+        });
+    </script>
+</body>
+</html>
+
