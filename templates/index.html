@@ -10,7 +10,14 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         .leaflet-container { background: #374151; } /* Dark grey for map background */
-        .leaflet-tooltip { background-color: rgba(31, 41, 55, 0.8); color: white; border: 1px solid #4b5563; box-shadow: none; }
+        .leaflet-tooltip { background-color: rgba(31, 41, 55, 0.9); color: white; border: 1px solid #4b5563; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 6px; }
+        .flight-route-tooltip { 
+            background-color: rgba(31, 41, 55, 0.95) !important; 
+            border: 1px solid #6b7280 !important;
+            border-radius: 8px !important;
+            padding: 8px !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 antialiased">
@@ -126,7 +133,10 @@
                     </div>
                     <div>
                         <label for="flightera_link" class="block text-sm font-medium text-gray-300">Flightera Link</label>
-                        <input type="url" name="flightera_link" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <div class="flex gap-2">
+                            <input type="url" name="flightera_link" id="flightera_link" class="flex-1 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" onclick="autoScrapeFlightera()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 whitespace-nowrap">Auto Fill</button>
+                        </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -136,6 +146,16 @@
                         <div>
                             <label for="actual_departure_time" class="block text-sm font-medium text-gray-300">Actual Departure</label>
                             <input type="datetime-local" name="actual_departure_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="scheduled_arrival_time" class="block text-sm font-medium text-gray-300">Scheduled Arrival</label>
+                            <input type="datetime-local" name="scheduled_arrival_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="actual_arrival_time" class="block text-sm font-medium text-gray-300">Actual Arrival</label>
+                            <input type="datetime-local" name="actual_arrival_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
                      <div>
@@ -158,7 +178,7 @@
 
 
     <script>
-        const flightsData = {{ flights|tojson }};
+        const flightsData = {{ flights|tojson|safe }};
         let map;
         let flightLayers = [];
 
@@ -236,21 +256,92 @@
             flightLayers = [];
             const visibleFlights = flightsData.filter(f => !f.is_skiplagged);
 
+            // Group flights by route (bidirectional)
+            const routeGroups = {};
+            
             visibleFlights.forEach(flight => {
                 if (flight.origin_coords && flight.dest_coords) {
-                    const flightPaths = getGreatCircleArc(flight.origin_coords, flight.dest_coords);
-                    const tooltipContent = `<b>${flight.carrier} ${flight.flight_number}</b><br>${flight.origin} → ${flight.destination}`;
+                    // Create a normalized route key that treats A→B and B→A as the same route
+                    const routeKey = [flight.origin, flight.destination].sort().join('-');
+                    
+                    if (!routeGroups[routeKey]) {
+                        routeGroups[routeKey] = {
+                            flights: [],
+                            coords: {
+                                origin: flight.origin_coords,
+                                destination: flight.dest_coords
+                            },
+                            airports: {
+                                origin: flight.origin,
+                                destination: flight.destination
+                            }
+                        };
+                    }
+                    
+                    routeGroups[routeKey].flights.push(flight);
+                }
+            });
 
-                    flightPaths.forEach(path => {
-                        // Draw the path on 3 world copies for seamless wrapping
-                        [-360, 0, 360].forEach(lonOffset => {
-                            const shiftedPath = path.map(point => [point[0], point[1] + lonOffset]);
-                            const polyline = L.polyline(shiftedPath, { color: '#2563EB', weight: 2, opacity: 0.7 }).addTo(map);
-                            polyline.bindTooltip(tooltipContent, { sticky: true });
-                            flightLayers.push(polyline);
-                        });
+            // Draw consolidated routes
+            Object.entries(routeGroups).forEach(([routeKey, routeData]) => {
+                const { flights, coords, airports } = routeData;
+                
+                // Use coordinates from the first flight for drawing the route
+                const flightPaths = getGreatCircleArc(coords.origin, coords.destination);
+                
+                // Create tooltip content with all flights on this route
+                const flightsByDirection = {
+                    forward: flights.filter(f => f.origin === airports.origin),
+                    reverse: flights.filter(f => f.origin === airports.destination)
+                };
+                
+                let tooltipContent = `<div style="max-width: 300px;">`;
+                
+                // Forward direction flights
+                if (flightsByDirection.forward.length > 0) {
+                    tooltipContent += `<div><b>${airports.origin} → ${airports.destination}</b></div>`;
+                    flightsByDirection.forward.forEach(flight => {
+                        const date = flight.departure_date || 'Unknown date';
+                        tooltipContent += `<div style="margin-left: 10px; font-size: 12px;">${flight.carrier} ${flight.flight_number} (${date})</div>`;
                     });
                 }
+                
+                // Reverse direction flights
+                if (flightsByDirection.reverse.length > 0) {
+                    if (flightsByDirection.forward.length > 0) {
+                        tooltipContent += `<div style="margin-top: 8px;"><b>${airports.destination} → ${airports.origin}</b></div>`;
+                    } else {
+                        tooltipContent += `<div><b>${airports.destination} → ${airports.origin}</b></div>`;
+                    }
+                    flightsByDirection.reverse.forEach(flight => {
+                        const date = flight.departure_date || 'Unknown date';
+                        tooltipContent += `<div style="margin-left: 10px; font-size: 12px;">${flight.carrier} ${flight.flight_number} (${date})</div>`;
+                    });
+                }
+                
+                tooltipContent += `<div style="margin-top: 8px; font-size: 11px; color: #888;">Total flights: ${flights.length}</div>`;
+                tooltipContent += `</div>`;
+
+                // Determine line weight based on number of flights
+                const lineWeight = Math.min(2 + flights.length * 0.5, 6);
+                const lineColor = flights.length > 2 ? '#DC2626' : '#2563EB'; // Red for busy routes, blue for others
+
+                flightPaths.forEach(path => {
+                    // Draw the path on 3 world copies for seamless wrapping
+                    [-360, 0, 360].forEach(lonOffset => {
+                        const shiftedPath = path.map(point => [point[0], point[1] + lonOffset]);
+                        const polyline = L.polyline(shiftedPath, { 
+                            color: lineColor, 
+                            weight: lineWeight, 
+                            opacity: 0.7 
+                        }).addTo(map);
+                        polyline.bindTooltip(tooltipContent, { 
+                            sticky: true,
+                            className: 'flight-route-tooltip'
+                        });
+                        flightLayers.push(polyline);
+                    });
+                });
             });
         }
 
@@ -276,9 +367,15 @@
                             <div><strong>Cabin:</strong> ${flight.cabin}</div>
                             <div><strong>Source:</strong> ${flight.source_file}</div>
                         </div>
-                        <div class="pt-4 border-t border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><strong>Scheduled:</strong> ${flight.scheduled_departure_time ? new Date(flight.scheduled_departure_time).toLocaleString() : 'N/A'}</div>
-                            <div><strong>Actual:</strong> ${flight.actual_departure_time ? new Date(flight.actual_departure_time).toLocaleString() : 'N/A'}</div>
+                        <div class="pt-4 border-t border-gray-700">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                                <div><strong>Scheduled Departure:</strong> ${flight.scheduled_departure_time ? formatTimeWithTimezone(flight.scheduled_departure_time) : 'N/A'}</div>
+                                <div><strong>Actual Departure:</strong> ${flight.actual_departure_time ? formatTimeWithTimezone(flight.actual_departure_time) : 'N/A'}</div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><strong>Scheduled Arrival:</strong> ${flight.scheduled_arrival_time ? formatTimeWithTimezone(flight.scheduled_arrival_time) : 'N/A'}</div>
+                                <div><strong>Actual Arrival:</strong> ${flight.actual_arrival_time ? formatTimeWithTimezone(flight.actual_arrival_time) : 'N/A'}</div>
+                            </div>
                         </div>
                     </div>
                     `;
@@ -375,6 +472,25 @@
             }
         }
 
+        // --- Time Formatting with Timezone ---
+        function formatTimeWithTimezone(timeString) {
+            try {
+                const date = new Date(timeString);
+                const options = {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZoneName: 'short'
+                };
+                return date.toLocaleString('en-US', options);
+            } catch (error) {
+                return timeString;
+            }
+        }
+
         // --- API Call for Skiplagging ---
         async function toggleSkiplagStatus(flightId) {
             try {
@@ -422,6 +538,145 @@
                     button.classList.add('bg-red-600', 'hover:bg-red-700');
                 }
              }
+        }
+
+        // --- Auto-scrape Flightera ---
+        async function autoScrapeFlightera() {
+            const flighteraInput = document.getElementById('flightera_link');
+            const flighteraUrl = flighteraInput.value.trim();
+            
+            if (!flighteraUrl) {
+                alert('Please enter a Flightera URL first.');
+                return;
+            }
+            
+            if (!flighteraUrl.includes('flightera.net')) {
+                alert('Please enter a valid Flightera URL.');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/scrape_flightera', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: flighteraUrl })
+                });
+                
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.error || 'Failed to scrape flight data');
+                }
+                
+                const result = await response.json();
+                if (result.success && result.data) {
+                    const data = result.data;
+                    
+                    console.log('Scraped data:', data); // Debug log
+                    
+                    // Fill form fields with scraped data - use more specific selectors
+                    const carrierInput = document.querySelector('#add-trip-form input[name="carrier"]');
+                    const flightNumberInput = document.querySelector('#add-trip-form input[name="flight_number"]');
+                    const originInput = document.querySelector('#add-trip-form input[name="origin"]');
+                    const destinationInput = document.querySelector('#add-trip-form input[name="destination"]');
+                    const scheduledDepartureInput = document.querySelector('#add-trip-form input[name="scheduled_departure_time"]');
+                    const actualDepartureInput = document.querySelector('#add-trip-form input[name="actual_departure_time"]');
+                    const scheduledArrivalInput = document.querySelector('#add-trip-form input[name="scheduled_arrival_time"]');
+                    const actualArrivalInput = document.querySelector('#add-trip-form input[name="actual_arrival_time"]');
+                    
+                    if (data.carrier && carrierInput) {
+                        carrierInput.value = data.carrier;
+                        console.log('Set carrier:', data.carrier);
+                    }
+                    if (data.flight_number && flightNumberInput) {
+                        flightNumberInput.value = data.flight_number;
+                        console.log('Set flight number:', data.flight_number);
+                    }
+                    if (data.origin && originInput) {
+                        originInput.value = data.origin;
+                        console.log('Set origin:', data.origin);
+                    }
+                    if (data.destination && destinationInput) {
+                        destinationInput.value = data.destination;
+                        console.log('Set destination:', data.destination);
+                    }
+                    
+                    // Handle time fields - convert HH:MM format to datetime-local if needed
+                    if (data.scheduled_departure_time && scheduledDepartureInput) {
+                        try {
+                            // If it's just time (HH:MM), we need to add a date for datetime-local input
+                            let timeValue = data.scheduled_departure_time;
+                            if (timeValue.match(/^\d{1,2}:\d{2}$/)) {
+                                // Add today's date for datetime-local input
+                                const today = new Date().toISOString().split('T')[0];
+                                timeValue = `${today}T${timeValue}`;
+                            }
+                            scheduledDepartureInput.value = timeValue;
+                            console.log('Set scheduled departure time:', timeValue);
+                        } catch (e) {
+                            console.error('Error setting scheduled departure time:', e);
+                        }
+                    }
+                    
+                    if (data.actual_departure_time && actualDepartureInput) {
+                        try {
+                            let timeValue = data.actual_departure_time;
+                            if (timeValue.match(/^\d{1,2}:\d{2}$/)) {
+                                const today = new Date().toISOString().split('T')[0];
+                                timeValue = `${today}T${timeValue}`;
+                            }
+                            actualDepartureInput.value = timeValue;
+                            console.log('Set actual departure time:', timeValue);
+                        } catch (e) {
+                            console.error('Error setting actual departure time:', e);
+                        }
+                    }
+                    
+                    if (data.scheduled_arrival_time && scheduledArrivalInput) {
+                        try {
+                            let timeValue = data.scheduled_arrival_time;
+                            if (timeValue.match(/^\d{1,2}:\d{2}$/)) {
+                                const today = new Date().toISOString().split('T')[0];
+                                timeValue = `${today}T${timeValue}`;
+                            }
+                            scheduledArrivalInput.value = timeValue;
+                            console.log('Set scheduled arrival time:', timeValue);
+                        } catch (e) {
+                            console.error('Error setting scheduled arrival time:', e);
+                        }
+                    }
+                    
+                    if (data.actual_arrival_time && actualArrivalInput) {
+                        try {
+                            let timeValue = data.actual_arrival_time;
+                            if (timeValue.match(/^\d{1,2}:\d{2}$/)) {
+                                const today = new Date().toISOString().split('T')[0];
+                                timeValue = `${today}T${timeValue}`;
+                            }
+                            actualArrivalInput.value = timeValue;
+                            console.log('Set actual arrival time:', timeValue);
+                        } catch (e) {
+                            console.error('Error setting actual arrival time:', e);
+                        }
+                    }
+                    
+                    alert(`Flight data auto-filled successfully!\nCarrier: ${data.carrier || 'N/A'}\nFlight: ${data.flight_number || 'N/A'}\nRoute: ${data.origin || 'N/A'} → ${data.destination || 'N/A'}`);
+                } else {
+                    throw new Error('No flight data found');
+                }
+            } catch (error) {
+                console.error('Error scraping Flightera:', error);
+                alert(`Could not auto-fill flight data: ${error.message}`);
+            }
+        }
+        
+        // Debug function to check form fields
+        function debugFormFields() {
+            const form = document.getElementById('add-trip-form');
+            const inputs = form.querySelectorAll('input, select');
+            console.log('Form fields:');
+            inputs.forEach(input => {
+                console.log(`${input.name}: ${input.value}`);
+            });
         }
 
         // --- Initial Load ---

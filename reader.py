@@ -11,6 +11,7 @@ import re
 def parse_boarding_pass(data_string: str) -> list[dict]:
     """
     Parses an IATA Bar Coded Boarding Pass (BCBP) string, including multi-leg passes.
+    Extracts both scheduled departure date and time when available.
 
     Args:
         data_string: The raw text data from the Aztec code.
@@ -58,9 +59,31 @@ def parse_boarding_pass(data_string: str) -> list[dict]:
                  departure_date = datetime(today.year - 1, 1, 1) + timedelta(days=julian_date - 1)
             elif (today - departure_date).days > 180:
                 departure_date = datetime(today.year + 1, 1, 1) + timedelta(days=julian_date - 1)
-            flight_data['departure_date'] = departure_date.strftime('%Y-%m-%d')
+            
+            # Extract departure time from details block if available (positions 9-12 for HHMM format)
+            departure_time_str = details_block[9:13] if len(details_block) >= 13 else "0000"
+            try:
+                hours = int(departure_time_str[:2])
+                minutes = int(departure_time_str[2:4])
+                departure_datetime = departure_date.replace(hour=hours, minute=minutes)
+                flight_data['scheduled_departure_time'] = departure_datetime.isoformat()
+            except (ValueError, IndexError):
+                flight_data['scheduled_departure_time'] = departure_date.isoformat()
+            
+            # Extract arrival time if available (typically in conditional section or extended data)
+            # For now, set as None - will be populated from conditional data if available
+            flight_data['scheduled_arrival_time'] = None
+            flight_data['actual_departure_time'] = None
+            flight_data['actual_arrival_time'] = None
+            
+            # Keep departure_date for backward compatibility
+            flight_data['scheduled_departure_date'] = departure_date.strftime('%Y-%m-%d')
         except (ValueError, TypeError):
-            flight_data['departure_date'] = None
+            flight_data['scheduled_departure_date'] = None
+            flight_data['scheduled_departure_time'] = None
+            flight_data['scheduled_arrival_time'] = None
+            flight_data['actual_departure_time'] = None
+            flight_data['actual_arrival_time'] = None
             
         cabin_code = details_block[3:4]
         cabin_map = {
@@ -151,28 +174,60 @@ def main():
             all_passes_data.extend(pass_data)
         print("-" * 20)
 
-    # Before saving, check existing data to preserve skiplag status if a file is re-processed.
-    # This is a simple implementation. A more robust one might use a database.
+    # Merge with existing data to preserve manually added flights and skiplag status
+    existing_data = []
     if os.path.exists(output_json_file):
         with open(output_json_file, 'r') as f:
             existing_data = json.load(f)
-            # Create a lookup for existing skiplag statuses
-            skiplag_lookup = {
-                f"{d.get('confirmation_number')}-{d.get('flight_number')}-{d.get('departure_date')}": d.get('is_skiplagged', False)
-                for d in existing_data
-            }
-            # Apply the old status to the new data
-            for new_pass in all_passes_data:
-                 key = f"{new_pass.get('confirmation_number')}-{new_pass.get('flight_number')}-{new_pass.get('departure_date')}"
-                 if key in skiplag_lookup:
-                     new_pass['is_skiplagged'] = skiplag_lookup[key]
+    
+    # Create a set of source files that are being processed
+    processed_files = {os.path.basename(img_path) for img_path in image_files}
+    
+    # Keep existing flights that are NOT from files being re-processed
+    preserved_flights = [
+        flight for flight in existing_data 
+        if flight.get('source_file') not in processed_files
+    ]
+    
+    # Create lookup for existing flights to preserve skiplag status and other manual changes
+    existing_lookup = {}
+    for flight in existing_data:
+        # Use multiple keys for robust matching
+        departure_date = flight.get('scheduled_departure_date') or (
+            flight.get('scheduled_departure_time', '').split('T')[0] if flight.get('scheduled_departure_time') else None
+        )
+        key = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{departure_date}"
+        existing_lookup[key] = flight
+    
+    # Apply existing data to newly parsed flights
+    for new_flight in all_passes_data:
+        departure_date = new_flight.get('scheduled_departure_date')
+        key = f"{new_flight.get('confirmation_number')}-{new_flight.get('flight_number')}-{departure_date}"
+        
+        if key in existing_lookup:
+            existing_flight = existing_lookup[key]
+            # Preserve manual fields
+            new_flight['is_skiplagged'] = existing_flight.get('is_skiplagged', False)
+            if existing_flight.get('flightera_link'):
+                new_flight['flightera_link'] = existing_flight['flightera_link']
+            if existing_flight.get('actual_departure_time'):
+                new_flight['actual_departure_time'] = existing_flight['actual_departure_time']
+            if existing_flight.get('scheduled_arrival_time'):
+                new_flight['scheduled_arrival_time'] = existing_flight['scheduled_arrival_time']
+            if existing_flight.get('actual_arrival_time'):
+                new_flight['actual_arrival_time'] = existing_flight['actual_arrival_time']
+    
+    # Combine preserved flights with newly parsed flights
+    final_data = preserved_flights + all_passes_data
 
 
     with open(output_json_file, 'w') as f:
-        json.dump(all_passes_data, f, indent=4, sort_keys=True)
+        json.dump(final_data, f, indent=4, sort_keys=True)
         
     print(f"\n✅ Done! Processed {len(image_files)} image files.")
-    print(f"Found a total of {len(all_passes_data)} flight legs.")
+    print(f"Found {len(all_passes_data)} new flight legs from images.")
+    print(f"Preserved {len(preserved_flights)} existing flights.")
+    print(f"Total flights in database: {len(final_data)}.")
     print(f"Combined data saved to '{output_json_file}'")
 
 if __name__ == "__main__":
