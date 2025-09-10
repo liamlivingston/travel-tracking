@@ -1,12 +1,23 @@
 from flask import Flask, render_template, jsonify, request
 import json
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 
 # --- Configuration ---
 PASS_DATA_FILE = 'boarding_passes.json'
 AIRPORT_DATA_FILE = 'data/airports.json'
+
+def extract_date_from_datetime(datetime_str):
+    """Extracts date from datetime string in ISO format."""
+    if not datetime_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
+        return dt.strftime('%Y-%m-%d')
+    except (ValueError, AttributeError):
+        return None
 
 def load_json_data(file_path):
     """Loads data from a JSON file."""
@@ -40,13 +51,17 @@ def dashboard():
         flight['origin_coords'] = airport_coords.get(origin_iata)
         flight['dest_coords'] = airport_coords.get(dest_iata)
         
+        # Extract date from scheduled_departure_time or fall back to scheduled_departure_date
+        departure_date = extract_date_from_datetime(flight.get('scheduled_departure_time')) or flight.get('scheduled_departure_date')
+        flight['departure_date'] = departure_date
+        
         # Generate a stable, unique ID for each flight for API calls
-        flight['id'] = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{flight.get('departure_date')}"
+        flight['id'] = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{departure_date or 'unknown'}"
         
         enriched_flights.append(flight)
 
     # Sort flights by departure date, most recent first
-    enriched_flights.sort(key=lambda x: x.get('departure_date', '0000-00-00'), reverse=True)
+    enriched_flights.sort(key=lambda x: x.get('departure_date') or '0000-00-00', reverse=True)
         
     return render_template('index.html', flights=enriched_flights)
 
@@ -65,7 +80,8 @@ def toggle_skiplag():
     flight_found = False
     for flight in flights:
         # Generate the same unique ID to find the matching flight
-        current_flight_id = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{flight.get('departure_date')}"
+        departure_date = extract_date_from_datetime(flight.get('scheduled_departure_time')) or flight.get('scheduled_departure_date')
+        current_flight_id = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{departure_date or 'unknown'}"
         if current_flight_id == flight_id_to_toggle:
             # Toggle the 'is_skiplagged' status
             flight['is_skiplagged'] = not flight.get('is_skiplagged', False)
@@ -89,7 +105,7 @@ def add_flight():
         return jsonify({"success": False, "error": "Invalid data"}), 400
 
     # Basic validation
-    required_fields = ['passenger_name', 'confirmation_number', 'departure_date', 'carrier', 'flight_number', 'origin', 'destination', 'cabin']
+    required_fields = ['passenger_name', 'confirmation_number', 'carrier', 'flight_number', 'origin', 'destination', 'cabin']
     if not all(field in new_flight_data for field in required_fields):
         return jsonify({"success": False, "error": "Missing required fields"}), 400
     
@@ -100,7 +116,6 @@ def add_flight():
     new_flight = {
         "passenger_name": new_flight_data.get('passenger_name').upper(),
         "confirmation_number": new_flight_data.get('confirmation_number').upper(),
-        "departure_date": new_flight_data.get('departure_date'),
         "carrier": new_flight_data.get('carrier').upper(),
         "flight_number": new_flight_data.get('flight_number'),
         "origin": new_flight_data.get('origin').upper(),
@@ -111,7 +126,10 @@ def add_flight():
         "source_file": "Manual Entry",
         "is_skiplagged": False,
         "eticket_indicator": "E", # Default value
-        "julian_date": "000" # Default value
+        "julian_date": "000", # Default value
+        "flightera_link": new_flight_data.get('flightera_link'),
+        "scheduled_departure_time": new_flight_data.get('scheduled_departure_time'),
+        "actual_departure_time": new_flight_data.get('actual_departure_time')
     }
 
     # Add the new flight to the list

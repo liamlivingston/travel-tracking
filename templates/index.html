@@ -100,25 +100,19 @@
                             <input type="text" name="confirmation_number" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="7" style="text-transform:uppercase">
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div>
-                            <label for="departure_date" class="block text-sm font-medium text-gray-300">Departure Date</label>
-                            <input type="date" name="departure_date" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                        </div>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
                             <label for="carrier" class="block text-sm font-medium text-gray-300">Airline (IATA)</label>
                             <input type="text" name="carrier" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="2" style="text-transform:uppercase">
                         </div>
-                    </div>
-                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="flight_number" class="block text-sm font-medium text-gray-300">Flight Number</label>
                             <input type="text" name="flight_number" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        <div>
-                            <label for="seat_number" class="block text-sm font-medium text-gray-300">Seat</label>
-                            <input type="text" name="seat_number" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" style="text-transform:uppercase">
-                        </div>
+                    </div>
+                     <div>
+                        <label for="seat_number" class="block text-sm font-medium text-gray-300">Seat</label>
+                        <input type="text" name="seat_number" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" style="text-transform:uppercase">
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -128,6 +122,20 @@
                         <div>
                             <label for="destination" class="block text-sm font-medium text-gray-300">Destination (IATA)</label>
                             <input type="text" name="destination" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="3" style="text-transform:uppercase">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="flightera_link" class="block text-sm font-medium text-gray-300">Flightera Link</label>
+                        <input type="url" name="flightera_link" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="scheduled_departure_time" class="block text-sm font-medium text-gray-300">Scheduled Departure</label>
+                            <input type="datetime-local" name="scheduled_departure_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="actual_departure_time" class="block text-sm font-medium text-gray-300">Actual Departure</label>
+                            <input type="datetime-local" name="actual_departure_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
                      <div>
@@ -250,30 +258,49 @@
         function openModal(flightId) {
             const flight = flightsData.find(f => f.id === flightId);
             if (!flight) return;
-            const modalContent = `
+            let modalContent = `
                 <div class="p-6">
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <h3 class="text-2xl font-bold text-white">${flight.carrier} ${flight.flight_number}</h3>
-                            <p class="text-gray-400">${flight.origin} to ${flight.destination}</p>
+                            <p class="text-gray-400">${flight.origin} → ${flight.destination}</p>
                         </div>
-                        <button onclick="closeModal()" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                        <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 text-sm text-gray-300">
-                        <div><strong>Date:</strong> ${flight.departure_date}</div>
-                        <div><strong>Seat:</strong> ${flight.seat_number}</div>
-                        <div><strong>Cabin:</strong> ${flight.cabin}</div>
-                        <div><strong>Sequence:</strong> ${flight.sequence_number}</div>
-                        <div class="col-span-2"><strong>Confirmation:</strong> <span class="font-mono">${flight.confirmation_number}</span></div>
-                        ${flight.ticket_number ? `<div class="col-span-2"><strong>Ticket Number:</strong> <span class="font-mono">${flight.ticket_number}</span></div>` : ''}
-                        ${flight.frequent_flyer_number ? `<div class="col-span-2"><strong>Frequent Flyer:</strong> ${flight.frequent_flyer_airline} - ${flight.frequent_flyer_number}</div>` : ''}
-                        <div class="col-span-2"><strong>Source File:</strong> ${flight.source_file}</div>
+                    <div class="space-y-4 text-gray-300">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><strong>Passenger:</strong> ${flight.passenger_name}</div>
+                            <div><strong>Seat:</strong> ${flight.seat_number}</div>
+                            <div><strong>Scheduled Date:</strong> ${flight.departure_date}</div>
+                            <div><strong>Confirmation:</strong> <span class="font-mono">${flight.confirmation_number}</span></div>
+                            <div><strong>Cabin:</strong> ${flight.cabin}</div>
+                            <div><strong>Source:</strong> ${flight.source_file}</div>
+                        </div>
+                        <div class="pt-4 border-t border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><strong>Scheduled:</strong> ${flight.scheduled_departure_time ? new Date(flight.scheduled_departure_time).toLocaleString() : 'N/A'}</div>
+                            <div><strong>Actual:</strong> ${flight.actual_departure_time ? new Date(flight.actual_departure_time).toLocaleString() : 'N/A'}</div>
+                        </div>
                     </div>
-                    <div class="mt-6 pt-4 border-t border-gray-700 flex justify-end">
-                        <button id="skiplag-btn-${flight.id}" onclick="toggleSkiplagStatus('${flight.id}')" 
-                                class="${flight.is_skiplagged ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-red-600 hover:bg-red-700'} text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
-                            ${flight.is_skiplagged ? 'Mark as Not Skiplagged' : 'Mark as Skiplagged'}
-                        </button>
+                    `;
+
+            if (flight.flightera_link) {
+                modalContent += `
+                    <div class="pt-4 border-t border-gray-700">
+                        <a href="${flight.flightera_link}" target="_blank" rel="noopener noreferrer" class="block w-full text-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                            View on Flightera
+                        </a>
+                    </div>`;
+            }
+
+            modalContent += `
+                        <div class="pt-4 mt-4 border-t border-gray-700">
+                            <button 
+                                id="skiplag-toggle-btn-${flight.id}" 
+                                onclick="toggleSkiplagStatus('${flight.id}')" 
+                                class="w-full font-bold py-2 px-4 rounded-md transition-colors duration-200 ${flight.is_skiplagged ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-700'}">
+                                ${flight.is_skiplagged ? 'Mark as Not Skiplagged' : 'Mark as Skiplagged'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
