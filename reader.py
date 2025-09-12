@@ -7,6 +7,8 @@ import os
 import glob
 import json
 import re
+from PIL import Image
+import tempfile
 
 def parse_boarding_pass(data_string: str) -> list[dict]:
     """
@@ -125,29 +127,79 @@ def parse_boarding_pass(data_string: str) -> list[dict]:
 
     return all_flights
 
+def convert_to_png(image_path: str) -> str | None:
+    """Converts an image to PNG format and returns the path to the converted file."""
+    try:
+        # Check if already PNG
+        if image_path.lower().endswith('.png'):
+            return image_path
+        
+        # Open image with PIL to handle various formats
+        with Image.open(image_path) as img:
+            # Convert to RGB if necessary (for formats like RGBA or P)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                # Create white background for transparent images
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Create temporary PNG file
+            temp_dir = tempfile.gettempdir()
+            base_name = os.path.splitext(os.path.basename(image_path))[0]
+            temp_png_path = os.path.join(temp_dir, f"{base_name}_converted.png")
+            
+            # Save as PNG
+            img.save(temp_png_path, 'PNG')
+            return temp_png_path
+            
+    except Exception as e:
+        print(f"    [!] Error converting {os.path.basename(image_path)} to PNG: {e}")
+        return None
+
 def process_image(image_path: str) -> list[dict] | None:
     """Decodes and parses a boarding pass from a single image file."""
     print(f"--> Processing {os.path.basename(image_path)}...")
-    img = cv2.imread(image_path)
-    if img is None:
-        print(f"    [!] Error: Could not open image at {image_path}")
+    
+    # Convert to PNG if necessary
+    png_path = convert_to_png(image_path)
+    if png_path is None:
         return None
-
-    results = zxingcpp.read_barcodes(img)
-    if not results:
-        print(f"    [!] No Aztec code detected in {os.path.basename(image_path)}.")
-        return None
-
-    res = results[0]
+    
+    # Track if we created a temporary file
+    is_temp_file = png_path != image_path
+    
     try:
-        parsed_flights = parse_boarding_pass(res.text)
-        for flight in parsed_flights:
-            flight['source_file'] = os.path.basename(image_path)
-        print(f"    [✓] Successfully parsed {len(parsed_flights)} flight leg(s).")
-        return parsed_flights
-    except Exception as e:
-        print(f"    [!] An error occurred during parsing: {e}")
-        return None
+        img = cv2.imread(png_path)
+        if img is None:
+            print(f"    [!] Error: Could not open image at {png_path}")
+            return None
+
+        results = zxingcpp.read_barcodes(img)
+        if not results:
+            print(f"    [!] No Aztec code detected in {os.path.basename(image_path)}.")
+            return None
+
+        res = results[0]
+        try:
+            parsed_flights = parse_boarding_pass(res.text)
+            for flight in parsed_flights:
+                flight['source_file'] = os.path.basename(image_path)
+            print(f"    [✓] Successfully parsed {len(parsed_flights)} flight leg(s).")
+            return parsed_flights
+        except Exception as e:
+            print(f"    [!] An error occurred during parsing: {e}")
+            return None
+    finally:
+        # Clean up temporary file if we created one
+        if is_temp_file and os.path.exists(png_path):
+            try:
+                os.remove(png_path)
+            except:
+                pass  # Ignore cleanup errors
 
 def main():
     """
@@ -161,10 +213,17 @@ def main():
         print(f"Error: Directory '{passes_directory}' not found. Please create it and add your boarding pass PNGs.")
         return
 
-    image_files = glob.glob(os.path.join(passes_directory, '*.png'))
+    # Support multiple image formats
+    supported_extensions = ['*.png', '*.jpg', '*.jpeg', '*.bmp', '*.tiff', '*.tif', '*.webp', '*.gif']
+    image_files = []
+    
+    for ext in supported_extensions:
+        image_files.extend(glob.glob(os.path.join(passes_directory, ext)))
+        image_files.extend(glob.glob(os.path.join(passes_directory, ext.upper())))
     
     if not image_files:
-        print(f"No .png files found in the '{passes_directory}' directory.")
+        print(f"No supported image files found in the '{passes_directory}' directory.")
+        print(f"Supported formats: {', '.join([ext.replace('*', '') for ext in supported_extensions])}")
         return
 
     all_passes_data = []
@@ -182,6 +241,11 @@ def main():
     
     # Create a set of source files that are being processed
     processed_files = {os.path.basename(img_path) for img_path in image_files}
+    
+    print(f"Found {len(image_files)} image files to process:")
+    for img_file in image_files:
+        print(f"  - {os.path.basename(img_file)}")
+    print()
     
     # Keep existing flights that are NOT from files being re-processed
     preserved_flights = [
