@@ -75,9 +75,9 @@ Make sure any required data files (e.g. `boarding_passes.json`) are present in t
 ## Usage
 
 1. Add or update boarding passes in JSON format.  
-2. Run the reader/parser script (likely `reader.py`) to extract / parse information.  
-3. Use `app.py` (or other interface) to view the parsed boarding passes, possibly via a template in `templates/`.  
-4. Temporary staging / processing may use the `temp/` folder.  
+2. Run the reader/parser script (`reader.py`) to extract / parse information.  
+3. Use `app.py` to run a Flask web app to view the flight data
+4. Temporary staging / processing uses the `temp/` folder.  
 
 ---
 
@@ -92,11 +92,10 @@ travel-tracking/
 ├── reader.py             # Parser logic for boarding passes / data extraction
 ├── boarding_passes.json  # Sample or real data for boarding passes
 ├── templates/            # HTML / SVG / other templating assets
-├── data/                 # Data storage (past / current travel / passes)
+├── data/                 # Data storage (airport data)
 ├── temp/                 # Temporary working files
 ├── requirements.txt      # Python dependency list
 ├── .gitignore            # Files/folders to ignore under version control
-├── assets (e.g. images)   # Aztec codes / SVGs / images used for display
 └── other utility scripts   # e.g. temp.py etc.
 ```
 
@@ -126,9 +125,3 @@ To contribute:
 2. Create a branch (`git checkout -b feature-name`)  
 3. Make your changes & commit  
 4. Open a pull request  
-
----
-
-## License
-
-Specify your license here. If none yet, consider adding one (MIT, Apache, etc.) so others know how they may use your code.
