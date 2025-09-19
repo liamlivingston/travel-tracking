@@ -46,6 +46,14 @@ git clone https://github.com/liamlivingston/travel-tracking.git
 cd travel-tracking
 ```
 
+Create and activate a virtual environment (recommended):
+
+```bash
+python3 -m venv env
+source env/bin/activate   # On macOS/Linux
+env\Scripts\activate    # On Windows
+```
+
 Install dependencies:
 
 ```bash
