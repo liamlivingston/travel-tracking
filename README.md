@@ -57,7 +57,7 @@ env\Scripts\activate    # On Windows
 Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### Running Locally
@@ -65,7 +65,7 @@ pip install -r requirements.txt
 After installing:
 
 ```bash
-python app.py
+python3 app.py
 ```
 
 Make sure any required data files (e.g. `boarding_passes.json`) are present in the `data/` folder (or wherever your configuration points).
