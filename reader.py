@@ -57,10 +57,19 @@ def parse_boarding_pass(data_string: str) -> list[dict]:
             julian_date = int(julian_date_str)
             today = datetime.now()
             departure_date = datetime(today.year, 1, 1) + timedelta(days=julian_date - 1)
+            
+            # --- START CHANGE (Option 1 Fix) ---
+            # If the date is > 180 days in the future (e.g., it's Jan
+            # and the pass is for Dec), set the year to the *previous* year.
             if (departure_date - today).days > 180:
                  departure_date = datetime(today.year - 1, 1, 1) + timedelta(days=julian_date - 1)
-            elif (today - departure_date).days > 180:
-                departure_date = datetime(today.year + 1, 1, 1) + timedelta(days=julian_date - 1)
+            
+            # We REMOVED the 'elif' block that was here.
+            # By default, a date far in the past (e.g., Jan 15 when
+            # today is Oct 27) will now correctly be set to
+            # the current year (Oct 27, 2025 -> Jan 15, 2025),
+            # NOT next year (2026).
+            # --- END CHANGE ---
             
             # Extract departure time from details block if available (positions 9-12 for HHMM format)
             departure_time_str = details_block[9:13] if len(details_block) >= 13 else "0000"
@@ -237,7 +246,11 @@ def main():
     existing_data = []
     if os.path.exists(output_json_file):
         with open(output_json_file, 'r') as f:
-            existing_data = json.load(f)
+            try:
+                existing_data = json.load(f)
+            except json.JSONDecodeError:
+                print(f"Warning: Could not read '{output_json_file}'. File might be corrupt. Starting fresh.")
+                existing_data = []
     
     # Create a set of source files that are being processed
     processed_files = {os.path.basename(img_path) for img_path in image_files}
@@ -256,21 +269,35 @@ def main():
     # Create lookup for existing flights to preserve skiplag status and other manual changes
     existing_lookup = {}
     for flight in existing_data:
-        # Use multiple keys for robust matching
-        departure_date = flight.get('scheduled_departure_date') or (
-            flight.get('scheduled_departure_time', '').split('T')[0] if flight.get('scheduled_departure_time') else None
-        )
-        key = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{departure_date}"
-        existing_lookup[key] = flight
+        # --- START CHANGE (Robust Merge Key) ---
+        # We now use a key based on data *only* from the pass,
+        # not the "guessed" year, to make matching robust.
+        key = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{flight.get('julian_date')}"
+        # --- END CHANGE ---
+        
+        if flight.get('julian_date'): # Only add flights that have a valid key
+            existing_lookup[key] = flight
     
     # Apply existing data to newly parsed flights
     for new_flight in all_passes_data:
-        departure_date = new_flight.get('scheduled_departure_date')
-        key = f"{new_flight.get('confirmation_number')}-{new_flight.get('flight_number')}-{departure_date}"
+        # --- START CHANGE (Robust Merge Key) ---
+        # Use the same robust key to look up the new flight
+        key = f"{new_flight.get('confirmation_number')}-{new_flight.get('flight_number')}-{new_flight.get('julian_date')}"
+        # --- END CHANGE ---
         
         if key in existing_lookup:
             existing_flight = existing_lookup[key]
-            # Preserve manual fields
+            
+            # --- START CHANGE (Preserve Existing Dates) ---
+            # If a flight already exists, trust its dates,
+            # especially if they were manually corrected in the JSON.
+            if existing_flight.get('scheduled_departure_time'):
+                new_flight['scheduled_departure_time'] = existing_flight['scheduled_departure_time']
+            if existing_flight.get('scheduled_departure_date'):
+                new_flight['scheduled_departure_date'] = existing_flight['scheduled_departure_date']
+            # --- END CHANGE ---
+
+            # Preserve other manual fields
             new_flight['is_skiplagged'] = existing_flight.get('is_skiplagged', False)
             if existing_flight.get('flightera_link'):
                 new_flight['flightera_link'] = existing_flight['flightera_link']
@@ -296,4 +323,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
