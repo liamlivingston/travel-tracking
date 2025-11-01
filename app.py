@@ -258,12 +258,6 @@ def scrape_flightera_data(url):
                 if any(keyword in table_text.lower() for keyword in ['departure', 'arrival', 'time', 'scheduled', 'actual']):
                     print(f"Debug: Table {i} with time info: {table_text[:300]}")
             
-            # Check for any elements containing "TLV" or "Tel Aviv"
-            tlv_elements = soup.find_all(string=re.compile(r'(TLV|Tel Aviv)', re.IGNORECASE))
-            for elem in tlv_elements[:3]:
-                parent_text = elem.parent.get_text() if hasattr(elem, 'parent') and elem.parent else str(elem)
-                print(f"Debug: Found TLV reference: {parent_text[:100]}")
-            
             # First, try to extract from URL structure
             # URL format: /flight_details/United+Airlines/UA954/KSFO/2023-07-21
             url_parts = url.split('/')
