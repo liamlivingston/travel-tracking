@@ -149,6 +149,51 @@ def add_flight():
     
     return jsonify({"success": True, "message": "Flight added successfully"})
 
+@app.route('/api/update_flight', methods=['POST'])
+def update_flight():
+    """API endpoint to update an existing flight."""
+    update_data = request.get_json()
+    flight_id = update_data.get('id')
+
+    if not flight_id:
+        return jsonify({"success": False, "error": "Flight ID is missing"}), 400
+
+    # Load the current flight data
+    flights = load_json_data(PASS_DATA_FILE)
+    
+    flight_index = -1
+    for i, flight in enumerate(flights):
+        # Generate the unique ID to find the match
+        departure_date = extract_date_from_datetime(flight.get('scheduled_departure_time')) or flight.get('scheduled_departure_date')
+        current_flight_id = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{departure_date or 'unknown'}"
+        
+        if current_flight_id == flight_id:
+            flight_index = i
+            break
+    
+    if flight_index == -1:
+         return jsonify({"success": False, "error": "Flight not found"}), 404
+
+    # Update fields if provided
+    flight = flights[flight_index]
+    
+    # Update allowed fields
+    if 'carrier' in update_data: flight['carrier'] = update_data['carrier'].upper()
+    if 'flight_number' in update_data: flight['flight_number'] = update_data['flight_number']
+    if 'origin' in update_data: flight['origin'] = update_data['origin'].upper()
+    if 'destination' in update_data: flight['destination'] = update_data['destination'].upper()
+    if 'scheduled_departure_time' in update_data: flight['scheduled_departure_time'] = update_data['scheduled_departure_time']
+    if 'actual_departure_time' in update_data: flight['actual_departure_time'] = update_data['actual_departure_time']
+    if 'scheduled_arrival_time' in update_data: flight['scheduled_arrival_time'] = update_data['scheduled_arrival_time']
+    if 'actual_arrival_time' in update_data: flight['actual_arrival_time'] = update_data['actual_arrival_time']
+    if 'flightera_link' in update_data: flight['flightera_link'] = update_data['flightera_link']
+    
+    # Save back
+    flights[flight_index] = flight
+    save_json_data(flights, PASS_DATA_FILE)
+
+    return jsonify({"success": True, "message": "Flight updated successfully"})
+
 def get_browser_headers():
     """Generate realistic browser headers to avoid detection."""
     user_agents = [
