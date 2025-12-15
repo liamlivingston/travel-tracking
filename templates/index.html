@@ -1,18 +1,35 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flight Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .leaflet-container { background: #374151; } /* Dark grey for map background */
-        .leaflet-tooltip { background-color: rgba(31, 41, 55, 0.9); color: white; border: 1px solid #4b5563; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 6px; }
-        .flight-route-tooltip { 
-            background-color: rgba(31, 41, 55, 0.95) !important; 
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .leaflet-container {
+            background: #374151;
+        }
+
+        /* Dark grey for map background */
+        .leaflet-tooltip {
+            background-color: rgba(31, 41, 55, 0.9);
+            color: white;
+            border: 1px solid #4b5563;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+        }
+
+        .flight-route-tooltip {
+            background-color: rgba(31, 41, 55, 0.95) !important;
             border: 1px solid #6b7280 !important;
             border-radius: 8px !important;
             padding: 8px !important;
@@ -20,6 +37,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-900 text-gray-200 antialiased">
 
     <div class="container mx-auto p-4 md:p-8">
@@ -39,38 +57,59 @@
             <section id="table-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-semibold text-white">All Flights ({{ flights|length }})</h2>
-                    <button onclick="openAddTripModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add Trip Manually</button>
+                    <button onclick="openAddTripModal()"
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add
+                        Trip Manually</button>
                 </div>
                 <div class="bg-gray-800 rounded-lg shadow-lg overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-700">
                         <thead class="bg-gray-700">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Flight</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Route</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden md:table-cell">Seat</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden sm:table-cell">Confirmation</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider"></th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                    Date</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                    Flight</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                    Route</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                                    Seat</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden sm:table-cell">
+                                    Confirmation</th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="bg-gray-800 divide-y divide-gray-700">
                             {% for flight in flights %}
-                            <tr id="flight-row-{{ flight.id }}" class="hover:bg-gray-700/50 transition-colors duration-200 {% if flight.is_skiplagged %} text-gray-500 opacity-60 {% endif %}">
+                            <tr id="flight-row-{{ flight.id }}"
+                                class="hover:bg-gray-700/50 transition-colors duration-200 {% if flight.is_skiplagged %} text-gray-500 opacity-60 {% endif %}">
                                 <td class="px-6 py-4 whitespace-nowrap">{{ flight.departure_date }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="font-medium text-white">{{ flight.carrier }} {{ flight.flight_number }}</div>
+                                    <div class="font-medium text-white">{{ flight.carrier }} {{ flight.flight_number }}
+                                    </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
-                                        <span class="font-mono bg-gray-700 text-gray-200 px-2 py-1 rounded-md">{{ flight.origin }}</span>
+                                        <span class="font-mono bg-gray-700 text-gray-200 px-2 py-1 rounded-md">{{
+                                            flight.origin }}</span>
                                         <span class="mx-2 text-gray-500">→</span>
-                                        <span class="font-mono bg-gray-700 text-gray-200 px-2 py-1 rounded-md">{{ flight.destination }}</span>
+                                        <span class="font-mono bg-gray-700 text-gray-200 px-2 py-1 rounded-md">{{
+                                            flight.destination }}</span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">{{ flight.seat_number }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell font-mono">{{ flight.confirmation_number }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">{{ flight.seat_number }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell font-mono">{{
+                                    flight.confirmation_number }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right">
-                                    <button onclick="openModal('{{ flight.id }}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Details</button>
+                                    <button onclick="openModal('{{ flight.id }}')"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Details</button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -82,85 +121,123 @@
     </div>
 
     <!-- Details Modal -->
-    <div id="details-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300" onclick="closeModal()">
-        <div id="details-modal" class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0" onclick="event.stopPropagation()">
+    <div id="details-modal-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300"
+        onclick="closeModal()">
+        <div id="details-modal"
+            class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0"
+            onclick="event.stopPropagation()">
             <!-- Modal content will be injected here -->
         </div>
     </div>
-    
+
     <!-- Manual Add Trip Modal -->
-    <div id="add-trip-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300" onclick="closeAddTripModal()">
-        <div id="add-trip-modal" class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0" onclick="event.stopPropagation()">
+    <div id="add-trip-modal-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300"
+        onclick="closeAddTripModal()">
+        <div id="add-trip-modal"
+            class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0"
+            onclick="event.stopPropagation()">
             <form id="add-trip-form" onsubmit="handleAddTripSubmit(event)" class="p-6">
                 <div class="flex justify-between items-start mb-6">
                     <h3 class="text-2xl font-bold text-white">Add a New Trip</h3>
-                    <button type="button" onclick="closeAddTripModal()" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                    <button type="button" onclick="closeAddTripModal()"
+                        class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
                 </div>
                 <div class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="passenger_name" class="block text-sm font-medium text-gray-300">Passenger Name</label>
-                            <input type="text" name="passenger_name" value="LIVINGSTON/KENTARO" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="passenger_name" class="block text-sm font-medium text-gray-300">Passenger
+                                Name</label>
+                            <input type="text" name="passenger_name" value="LIVINGSTON/KENTARO" required
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
-                            <label for="confirmation_number" class="block text-sm font-medium text-gray-300">Confirmation #</label>
-                            <input type="text" name="confirmation_number" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="7" style="text-transform:uppercase">
+                            <label for="confirmation_number"
+                                class="block text-sm font-medium text-gray-300">Confirmation #</label>
+                            <input type="text" name="confirmation_number"
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                maxlength="7" style="text-transform:uppercase">
                         </div>
                     </div>
-                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
                             <label for="carrier" class="block text-sm font-medium text-gray-300">Airline (IATA)</label>
-                            <input type="text" name="carrier" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="2" style="text-transform:uppercase">
+                            <input type="text" name="carrier" required
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                maxlength="2" style="text-transform:uppercase">
                         </div>
                         <div>
-                            <label for="flight_number" class="block text-sm font-medium text-gray-300">Flight Number</label>
-                            <input type="text" name="flight_number" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="flight_number" class="block text-sm font-medium text-gray-300">Flight
+                                Number</label>
+                            <input type="text" name="flight_number" required
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
-                     <div>
+                    <div>
                         <label for="seat_number" class="block text-sm font-medium text-gray-300">Seat</label>
-                        <input type="text" name="seat_number" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" style="text-transform:uppercase">
+                        <input type="text" name="seat_number"
+                            class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            style="text-transform:uppercase">
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="origin" class="block text-sm font-medium text-gray-300">Origin (IATA)</label>
-                            <input type="text" name="origin" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="3" style="text-transform:uppercase">
+                            <input type="text" name="origin" required
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                maxlength="3" style="text-transform:uppercase">
                         </div>
                         <div>
-                            <label for="destination" class="block text-sm font-medium text-gray-300">Destination (IATA)</label>
-                            <input type="text" name="destination" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500" maxlength="3" style="text-transform:uppercase">
+                            <label for="destination" class="block text-sm font-medium text-gray-300">Destination
+                                (IATA)</label>
+                            <input type="text" name="destination" required
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                maxlength="3" style="text-transform:uppercase">
                         </div>
                     </div>
                     <div>
-                        <label for="flightera_link" class="block text-sm font-medium text-gray-300">Flightera Link</label>
+                        <label for="flightera_link" class="block text-sm font-medium text-gray-300">Flightera
+                            Link</label>
                         <div class="flex gap-2">
-                            <input type="url" name="flightera_link" id="flightera_link" class="flex-1 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <button type="button" onclick="autoScrapeFlightera()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 whitespace-nowrap">Auto Fill</button>
+                            <input type="url" name="flightera_link" id="flightera_link"
+                                class="flex-1 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" onclick="autoScrapeFlightera()"
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 whitespace-nowrap">Auto
+                                Fill</button>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="scheduled_departure_time" class="block text-sm font-medium text-gray-300">Scheduled Departure</label>
-                            <input type="datetime-local" name="scheduled_departure_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="scheduled_departure_time"
+                                class="block text-sm font-medium text-gray-300">Scheduled Departure</label>
+                            <input type="datetime-local" name="scheduled_departure_time"
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
-                            <label for="actual_departure_time" class="block text-sm font-medium text-gray-300">Actual Departure</label>
-                            <input type="datetime-local" name="actual_departure_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="actual_departure_time" class="block text-sm font-medium text-gray-300">Actual
+                                Departure</label>
+                            <input type="datetime-local" name="actual_departure_time"
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="scheduled_arrival_time" class="block text-sm font-medium text-gray-300">Scheduled Arrival</label>
-                            <input type="datetime-local" name="scheduled_arrival_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="scheduled_arrival_time"
+                                class="block text-sm font-medium text-gray-300">Scheduled Arrival</label>
+                            <input type="datetime-local" name="scheduled_arrival_time"
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
-                            <label for="actual_arrival_time" class="block text-sm font-medium text-gray-300">Actual Arrival</label>
-                            <input type="datetime-local" name="actual_arrival_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="actual_arrival_time" class="block text-sm font-medium text-gray-300">Actual
+                                Arrival</label>
+                            <input type="datetime-local" name="actual_arrival_time"
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
-                     <div>
+                    <div>
                         <label for="cabin" class="block text-sm font-medium text-gray-300">Cabin</label>
-                        <select name="cabin" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <select name="cabin"
+                            class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             <option>Economy</option>
                             <option>Premium Economy</option>
                             <option>Business</option>
@@ -169,16 +246,98 @@
                     </div>
                 </div>
                 <div class="mt-6 pt-4 border-t border-gray-700 flex justify-end">
-                    <button type="button" onclick="closeAddTripModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 mr-2">Cancel</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add Flight</button>
+                    <button type="button" onclick="closeAddTripModal()"
+                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 mr-2">Cancel</button>
+                    <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add
+                        Flight</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Flightera Update Modal -->
+    <div id="flightera-update-modal-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1001] transition-opacity duration-300"
+        onclick="closeFlighteraUpdateModal()">
+        <div id="flightera-update-modal"
+            class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0"
+            onclick="event.stopPropagation()">
+            <form id="flightera-update-form" onsubmit="handleFlighteraUpdateSubmit(event)" class="p-6">
+                <input type="hidden" name="flight_id" id="flightera-update-flight-id">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h3 class="text-2xl font-bold text-white">Add Flightera Data</h3>
+                        <p id="flightera-update-flight-info" class="text-gray-400 mt-1"></p>
+                    </div>
+                    <button type="button" onclick="closeFlighteraUpdateModal()"
+                        class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label for="flightera_update_link" class="block text-sm font-medium text-gray-300">Flightera
+                            Link</label>
+                        <div class="flex gap-2 mt-1">
+                            <input type="url" name="flightera_link" id="flightera_update_link"
+                                placeholder="https://www.flightera.net/en/flight_details/..."
+                                class="flex-1 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" onclick="autoScrapeFlighteraUpdate()" id="flightera-scrape-btn"
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 whitespace-nowrap">Pull
+                                Data</button>
+                        </div>
+                    </div>
+                    <div id="flightera-scraped-data" class="hidden space-y-4">
+                        <div class="bg-gray-700 p-3 rounded-md">
+                            <p class="text-sm text-green-400 mb-2">✓ Data pulled successfully. Review and edit as
+                                needed:</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="flightera_scheduled_departure_time"
+                                    class="block text-sm font-medium text-gray-300">Scheduled Departure</label>
+                                <input type="datetime-local" name="scheduled_departure_time"
+                                    id="flightera_scheduled_departure_time"
+                                    class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="flightera_actual_departure_time"
+                                    class="block text-sm font-medium text-gray-300">Actual Departure</label>
+                                <input type="datetime-local" name="actual_departure_time"
+                                    id="flightera_actual_departure_time"
+                                    class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="flightera_scheduled_arrival_time"
+                                    class="block text-sm font-medium text-gray-300">Scheduled Arrival</label>
+                                <input type="datetime-local" name="scheduled_arrival_time"
+                                    id="flightera_scheduled_arrival_time"
+                                    class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="flightera_actual_arrival_time"
+                                    class="block text-sm font-medium text-gray-300">Actual Arrival</label>
+                                <input type="datetime-local" name="actual_arrival_time"
+                                    id="flightera_actual_arrival_time"
+                                    class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 pt-4 border-t border-gray-700 flex justify-end">
+                    <button type="button" onclick="closeFlighteraUpdateModal()"
+                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 mr-2">Cancel</button>
+                    <button type="submit" id="flightera-save-btn"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
-        const flightsData = {{ flights|tojson|safe }};
+        const flightsData = {{ flights| tojson | safe }};
         let map;
         let flightLayers = [];
 
@@ -198,7 +357,7 @@
             const d = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin((lat1 - lat2) / 2), 2) +
                 Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon1 - lon2) / 2), 2)));
 
-            if (Math.abs(d) < 1e-6) return [[startCoords, endCoords]]; 
+            if (Math.abs(d) < 1e-6) return [[startCoords, endCoords]];
 
             const points = [];
             for (let i = 0; i <= numPoints; i++) {
@@ -212,7 +371,7 @@
                 const lon = Math.atan2(y, x);
                 points.push([toDegrees(lat), toDegrees(lon)]);
             }
-            
+
             const lines = [];
             let currentLine = [];
             for (let i = 0; i < points.length; i++) {
@@ -224,7 +383,7 @@
                     const direction = lonDiff > 0 ? -1 : 1;
                     const lonEdge = 180 * direction;
                     const latAtEdge = lastPoint[0] + (lonEdge - lastPoint[1]) * (thisPoint[0] - lastPoint[0]) / lonDiff;
-                    
+
                     currentLine[currentLine.length - 1] = [latAtEdge, lonEdge];
                     lines.push(currentLine);
                     currentLine = [[latAtEdge, -lonEdge], thisPoint];
@@ -247,7 +406,7 @@
                 maxZoom: 19
                 // noWrap: true was removed to allow the map to repeat horizontally
             }).addTo(map);
-            
+
             drawFlightsOnMap();
         }
 
@@ -258,12 +417,12 @@
 
             // Group flights by route (bidirectional)
             const routeGroups = {};
-            
+
             visibleFlights.forEach(flight => {
                 if (flight.origin_coords && flight.dest_coords) {
                     // Create a normalized route key that treats A→B and B→A as the same route
                     const routeKey = [flight.origin, flight.destination].sort().join('-');
-                    
+
                     if (!routeGroups[routeKey]) {
                         routeGroups[routeKey] = {
                             flights: [],
@@ -277,7 +436,7 @@
                             }
                         };
                     }
-                    
+
                     routeGroups[routeKey].flights.push(flight);
                 }
             });
@@ -285,18 +444,18 @@
             // Draw consolidated routes
             Object.entries(routeGroups).forEach(([routeKey, routeData]) => {
                 const { flights, coords, airports } = routeData;
-                
+
                 // Use coordinates from the first flight for drawing the route
                 const flightPaths = getGreatCircleArc(coords.origin, coords.destination);
-                
+
                 // Create tooltip content with all flights on this route
                 const flightsByDirection = {
                     forward: flights.filter(f => f.origin === airports.origin),
                     reverse: flights.filter(f => f.origin === airports.destination)
                 };
-                
+
                 let tooltipContent = `<div style="max-width: 300px;">`;
-                
+
                 // Forward direction flights
                 if (flightsByDirection.forward.length > 0) {
                     tooltipContent += `<div><b>${airports.origin} → ${airports.destination}</b></div>`;
@@ -305,7 +464,7 @@
                         tooltipContent += `<div style="margin-left: 10px; font-size: 12px;">${flight.carrier} ${flight.flight_number} (${date})</div>`;
                     });
                 }
-                
+
                 // Reverse direction flights
                 if (flightsByDirection.reverse.length > 0) {
                     if (flightsByDirection.forward.length > 0) {
@@ -318,7 +477,7 @@
                         tooltipContent += `<div style="margin-left: 10px; font-size: 12px;">${flight.carrier} ${flight.flight_number} (${date})</div>`;
                     });
                 }
-                
+
                 tooltipContent += `<div style="margin-top: 8px; font-size: 11px; color: #888;">Total flights: ${flights.length}</div>`;
                 tooltipContent += `</div>`;
 
@@ -330,12 +489,12 @@
                     // Draw the path on 3 world copies for seamless wrapping
                     [-360, 0, 360].forEach(lonOffset => {
                         const shiftedPath = path.map(point => [point[0], point[1] + lonOffset]);
-                        const polyline = L.polyline(shiftedPath, { 
-                            color: lineColor, 
-                            weight: lineWeight, 
-                            opacity: 0.7 
+                        const polyline = L.polyline(shiftedPath, {
+                            color: lineColor,
+                            weight: lineWeight,
+                            opacity: 0.7
                         }).addTo(map);
-                        polyline.bindTooltip(tooltipContent, { 
+                        polyline.bindTooltip(tooltipContent, {
                             sticky: true,
                             className: 'flight-route-tooltip'
                         });
@@ -382,10 +541,20 @@
 
             if (flight.flightera_link) {
                 modalContent += `
-                    <div class="pt-4 border-t border-gray-700">
-                        <a href="${flight.flightera_link}" target="_blank" rel="noopener noreferrer" class="block w-full text-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                    <div class="pt-4 border-t border-gray-700 flex gap-2">
+                        <a href="${flight.flightera_link}" target="_blank" rel="noopener noreferrer" class="flex-1 text-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                             View on Flightera
                         </a>
+                        <button onclick="openFlighteraUpdateModal('${flight.id}')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                            Update Times
+                        </button>
+                    </div>`;
+            } else {
+                modalContent += `
+                    <div class="pt-4 border-t border-gray-700">
+                        <button onclick="openFlighteraUpdateModal('${flight.id}')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                            Add Flightera Data
+                        </button>
                     </div>`;
             }
 
@@ -525,54 +694,54 @@
                 }
             }
         }
-        
+
         function updateSkiplagButtonUI(flightId, isSkiplagged) {
-             const button = document.getElementById(`skiplag-btn-${flightId}`);
-             if(button) {
+            const button = document.getElementById(`skiplag-btn-${flightId}`);
+            if (button) {
                 button.textContent = isSkiplagged ? 'Mark as Not Skiplagged' : 'Mark as Skiplagged';
-                if(isSkiplagged) {
+                if (isSkiplagged) {
                     button.classList.remove('bg-red-600', 'hover:bg-red-700');
                     button.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
                 } else {
                     button.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
                     button.classList.add('bg-red-600', 'hover:bg-red-700');
                 }
-             }
+            }
         }
 
         // --- Auto-scrape Flightera ---
         async function autoScrapeFlightera() {
             const flighteraInput = document.getElementById('flightera_link');
             const flighteraUrl = flighteraInput.value.trim();
-            
+
             if (!flighteraUrl) {
                 alert('Please enter a Flightera URL first.');
                 return;
             }
-            
+
             if (!flighteraUrl.includes('flightera.net')) {
                 alert('Please enter a valid Flightera URL.');
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/scrape_flightera', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: flighteraUrl })
                 });
-                
+
                 if (!response.ok) {
                     const errorResult = await response.json();
                     throw new Error(errorResult.error || 'Failed to scrape flight data');
                 }
-                
+
                 const result = await response.json();
                 if (result.success && result.data) {
                     const data = result.data;
-                    
+
                     console.log('Scraped data:', data); // Debug log
-                    
+
                     // Fill form fields with scraped data - use more specific selectors
                     const carrierInput = document.querySelector('#add-trip-form input[name="carrier"]');
                     const flightNumberInput = document.querySelector('#add-trip-form input[name="flight_number"]');
@@ -582,7 +751,7 @@
                     const actualDepartureInput = document.querySelector('#add-trip-form input[name="actual_departure_time"]');
                     const scheduledArrivalInput = document.querySelector('#add-trip-form input[name="scheduled_arrival_time"]');
                     const actualArrivalInput = document.querySelector('#add-trip-form input[name="actual_arrival_time"]');
-                    
+
                     if (data.carrier && carrierInput) {
                         carrierInput.value = data.carrier;
                         console.log('Set carrier:', data.carrier);
@@ -599,7 +768,7 @@
                         destinationInput.value = data.destination;
                         console.log('Set destination:', data.destination);
                     }
-                    
+
                     // Handle time fields - convert HH:MM format to datetime-local if needed
                     if (data.scheduled_departure_time && scheduledDepartureInput) {
                         try {
@@ -616,7 +785,7 @@
                             console.error('Error setting scheduled departure time:', e);
                         }
                     }
-                    
+
                     if (data.actual_departure_time && actualDepartureInput) {
                         try {
                             let timeValue = data.actual_departure_time;
@@ -630,7 +799,7 @@
                             console.error('Error setting actual departure time:', e);
                         }
                     }
-                    
+
                     if (data.scheduled_arrival_time && scheduledArrivalInput) {
                         try {
                             let timeValue = data.scheduled_arrival_time;
@@ -644,7 +813,7 @@
                             console.error('Error setting scheduled arrival time:', e);
                         }
                     }
-                    
+
                     if (data.actual_arrival_time && actualArrivalInput) {
                         try {
                             let timeValue = data.actual_arrival_time;
@@ -658,7 +827,7 @@
                             console.error('Error setting actual arrival time:', e);
                         }
                     }
-                    
+
                     alert(`Flight data auto-filled successfully!\nCarrier: ${data.carrier || 'N/A'}\nFlight: ${data.flight_number || 'N/A'}\nRoute: ${data.origin || 'N/A'} → ${data.destination || 'N/A'}`);
                 } else {
                     throw new Error('No flight data found');
@@ -668,7 +837,7 @@
                 alert(`Could not auto-fill flight data: ${error.message}`);
             }
         }
-        
+
         // Debug function to check form fields
         function debugFormFields() {
             const form = document.getElementById('add-trip-form');
@@ -679,10 +848,181 @@
             });
         }
 
+        // --- Flightera Update Modal ---
+        function openFlighteraUpdateModal(flightId) {
+            const flight = flightsData.find(f => f.id === flightId);
+            if (!flight) return;
+
+            // Close the details modal first
+            closeModal();
+
+            // Set the flight ID and info
+            document.getElementById('flightera-update-flight-id').value = flightId;
+            document.getElementById('flightera-update-flight-info').textContent = `${flight.carrier} ${flight.flight_number} (${flight.origin} → ${flight.destination})`;
+
+            // Pre-fill the Flightera link if it exists
+            if (flight.flightera_link) {
+                document.getElementById('flightera_update_link').value = flight.flightera_link;
+            }
+
+            // Reset the form state
+            document.getElementById('flightera-scraped-data').classList.add('hidden');
+            document.getElementById('flightera-save-btn').disabled = true;
+
+            // Open the modal
+            const backdrop = document.getElementById('flightera-update-modal-backdrop');
+            const modal = document.getElementById('flightera-update-modal');
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                modal.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeFlighteraUpdateModal() {
+            const backdrop = document.getElementById('flightera-update-modal-backdrop');
+            const modal = document.getElementById('flightera-update-modal');
+            backdrop.classList.remove('opacity-100');
+            modal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex');
+                document.getElementById('flightera-update-form').reset();
+                document.getElementById('flightera-scraped-data').classList.add('hidden');
+                document.getElementById('flightera-save-btn').disabled = true;
+            }, 300);
+        }
+
+        async function autoScrapeFlighteraUpdate() {
+            const flighteraInput = document.getElementById('flightera_update_link');
+            const flighteraUrl = flighteraInput.value.trim();
+            const scrapeBtn = document.getElementById('flightera-scrape-btn');
+
+            if (!flighteraUrl) {
+                alert('Please enter a Flightera URL first.');
+                return;
+            }
+
+            if (!flighteraUrl.includes('flightera.net')) {
+                alert('Please enter a valid Flightera URL.');
+                return;
+            }
+
+            // Show loading state
+            scrapeBtn.textContent = 'Pulling...';
+            scrapeBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/scrape_flightera', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: flighteraUrl })
+                });
+
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.error || 'Failed to scrape flight data');
+                }
+
+                const result = await response.json();
+                if (result.success && result.data) {
+                    const data = result.data;
+                    console.log('Scraped data for update:', data);
+
+                    // Fill the form fields
+                    const scheduledDeptInput = document.getElementById('flightera_scheduled_departure_time');
+                    const actualDeptInput = document.getElementById('flightera_actual_departure_time');
+                    const scheduledArrInput = document.getElementById('flightera_scheduled_arrival_time');
+                    const actualArrInput = document.getElementById('flightera_actual_arrival_time');
+
+                    if (data.scheduled_departure_time) {
+                        scheduledDeptInput.value = formatTimeForInput(data.scheduled_departure_time);
+                    }
+                    if (data.actual_departure_time) {
+                        actualDeptInput.value = formatTimeForInput(data.actual_departure_time);
+                    }
+                    if (data.scheduled_arrival_time) {
+                        scheduledArrInput.value = formatTimeForInput(data.scheduled_arrival_time);
+                    }
+                    if (data.actual_arrival_time) {
+                        actualArrInput.value = formatTimeForInput(data.actual_arrival_time);
+                    }
+
+                    // Show the scraped data section and enable save
+                    document.getElementById('flightera-scraped-data').classList.remove('hidden');
+                    document.getElementById('flightera-save-btn').disabled = false;
+                } else {
+                    throw new Error('No flight data found');
+                }
+            } catch (error) {
+                console.error('Error scraping Flightera:', error);
+                alert(`Could not pull flight data: ${error.message}`);
+            } finally {
+                scrapeBtn.textContent = 'Pull Data';
+                scrapeBtn.disabled = false;
+            }
+        }
+
+        function formatTimeForInput(timeString) {
+            // Convert time string to datetime-local format (YYYY-MM-DDTHH:MM)
+            if (!timeString) return '';
+
+            // If it already has 'T' in it, it might be in the right format
+            if (timeString.includes('T')) {
+                // Extract YYYY-MM-DDTHH:MM part
+                const match = timeString.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+                if (match) return match[1];
+            }
+
+            // If it's just a time (HH:MM), we can't add a date
+            if (timeString.match(/^\d{1,2}:\d{2}$/)) {
+                return ''; // Skip time-only values for datetime-local inputs
+            }
+
+            return timeString;
+        }
+
+        async function handleFlighteraUpdateSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            const flightId = formData.get('flight_id');
+            const updateData = {
+                id: flightId,
+                flightera_link: formData.get('flightera_link'),
+                scheduled_departure_time: formData.get('scheduled_departure_time') || null,
+                actual_departure_time: formData.get('actual_departure_time') || null,
+                scheduled_arrival_time: formData.get('scheduled_arrival_time') || null,
+                actual_arrival_time: formData.get('actual_arrival_time') || null
+            };
+
+            try {
+                const response = await fetch('/api/update_flight', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updateData)
+                });
+
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.error || 'Failed to update flight');
+                }
+
+                closeFlighteraUpdateModal();
+                window.location.reload(); // Reload to see the updated flight
+            } catch (error) {
+                console.error('Error updating flight:', error);
+                alert(`Could not update flight: ${error.message}`);
+            }
+        }
+
         // --- Initial Load ---
         document.addEventListener('DOMContentLoaded', () => {
             initializeMap();
         });
     </script>
 </body>
+
 </html>
