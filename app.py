@@ -8,6 +8,8 @@ import re
 import pytz
 from urllib.parse import urlparse
 import time
+from reader import process_image
+import tempfile
 import random
 
 app = Flask(__name__)
@@ -654,6 +656,58 @@ def scrape_flightera():
         return jsonify({"success": False, "error": f"Network error: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": f"Parsing error: {str(e)}"}), 500
+
+import subprocess
+import sys
+
+# ... (other imports)
+
+@app.route('/api/upload_pass', methods=['POST'])
+def upload_pass():
+    """API endpoint to upload a boarding pass image and process it via reader.py."""
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No selected file"}), 400
+
+    if file:
+        # Save to 'passes' directory
+        passes_dir = 'passes'
+        if not os.path.exists(passes_dir):
+            os.makedirs(passes_dir)
+            
+        filename = file.filename
+        # Ensure unique filename to prevent overwriting if needed, but for now simple correct path
+        filepath = os.path.join(passes_dir, filename)
+        file.save(filepath)
+
+        try:
+            # Run reader.py as a subprocess
+            # This will process ALL files in passes/, including the new one
+            result = subprocess.run([sys.executable, 'reader.py'], capture_output=True, text=True)
+            
+            # Print stdout so we can see the "Raw Data" logs from reader.py
+            print(result.stdout)
+            
+            if result.returncode != 0:
+                print(f"Subprocess Error: {result.stderr}")
+                return jsonify({"success": False, "error": f"Reader script failed: {result.stderr}"}), 500
+
+            # Reload flights to return accurate count/data
+            flights = load_json_data(PASS_DATA_FILE)
+            
+            return jsonify({
+                "success": True, 
+                "message": "Processed successfully via reader script.",
+                "data": [] # Not returning detailed list of added flights since reader.py doesn't output machine-readable diff
+            })
+
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return jsonify({"success": False, "error": "Unknown error"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

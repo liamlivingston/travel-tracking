@@ -10,6 +10,8 @@
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -57,9 +59,15 @@
             <section id="table-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-semibold text-white">All Flights ({{ flights|length }})</h2>
-                    <button onclick="openAddTripModal()"
-                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add
-                        Trip Manually</button>
+                    <div class="flex gap-2">
+                        <button onclick="openAddImageModal()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                            Add via Image
+                        </button>
+                        <button onclick="openAddTripModal()"
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add
+                            Trip Manually</button>
+                    </div>
                 </div>
                 <div class="bg-gray-800 rounded-lg shadow-lg overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-700">
@@ -149,7 +157,7 @@
                         <div>
                             <label for="passenger_name" class="block text-sm font-medium text-gray-300">Passenger
                                 Name</label>
-                            <input type="text" name="passenger_name" value="LIVINGSTON/KENTARO" required
+                            <input type="text" name="passenger_name" value="LIVINGSTON/LIAM" required
                                 class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
@@ -336,8 +344,76 @@
         </div>
     </div>
 
+    <!-- Add Image Modal -->
+    <div id="add-image-modal-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300"
+        onclick="closeAddImageModal()">
+        <div id="add-image-modal"
+            class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl m-4 transform transition-all duration-300 scale-95 opacity-0 flex flex-col max-h-[90vh]"
+            onclick="event.stopPropagation()">
+
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">Add Flight from Image</h3>
+                <button type="button" onclick="closeAddImageModal()"
+                    class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+
+            <div class="p-6 flex-1 overflow-y-auto">
+                <div id="upload-step-1" class="space-y-4">
+                    <div class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center"
+                        ondrop="handleDrop(event)" ondragover="event.preventDefault()">
+                        <p class="text-gray-300 mb-4">Drag and drop boarding pass images here, or click to select.</p>
+                        <input type="file" id="image-input" accept="image/*" multiple class="hidden"
+                            onchange="handleFileSelect(event)">
+                        <button onclick="document.getElementById('image-input').click()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition-colors duration-200">
+                            Select Images
+                        </button>
+                    </div>
+                </div>
+
+                <div id="upload-step-2" class="hidden h-full flex flex-col">
+                    <div class="mb-4 flex justify-between items-center">
+                        <span class="text-gray-300">Processing image <span id="current-image-num">1</span> of <span
+                                id="total-images-num">1</span></span>
+                        <div class="flex gap-2">
+                            <button onclick="skipCurrentImage()"
+                                class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md transition-colors duration-200 text-sm">
+                                Skip
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Error Message Container -->
+                    <div id="upload-error-msg"
+                        class="hidden mb-4 bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded relative"
+                        role="alert">
+                        <span class="block sm:inline" id="upload-error-text"></span>
+                    </div>
+
+                    <div class="flex-1 bg-gray-900 rounded-lg overflow-hidden relative min-h-[400px]">
+                        <img id="cropper-image" src="" alt="To Crop" class="max-w-full">
+                    </div>
+
+                    <div class="mt-4 flex justify-end">
+                        <button onclick="processCurrentImage()"
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-md transition-colors duration-200 flex items-center">
+                            <span id="process-btn-text">Crop & Parse</span>
+                            <div id="process-spinner"
+                                class="hidden ml-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin">
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script id="flights-data" type="application/json">
+        {{ flights | tojson | safe }}
+    </script>
     <script>
-        const flightsData = {{ flights| tojson | safe }};
+        const flightsData = JSON.parse(document.getElementById('flights-data').textContent);
         let map;
         let flightLayers = [];
 
@@ -483,7 +559,7 @@
 
                 // Determine line weight based on number of flights
                 const lineWeight = Math.min(2 + flights.length * 0.5, 6);
-                const lineColor = flights.length > 2 ? '#DC2626' : '#2563EB'; // Red for busy routes, blue for others
+                const lineColor = flights.length > 1 ? '#DC2626' : '#2563EB'; // Red for busy routes (more than 1 flight), blue for single
 
                 flightPaths.forEach(path => {
                     // Draw the path on 3 world copies for seamless wrapping
@@ -1022,6 +1098,213 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeMap();
         });
+
+        // --- Add Image Modal & Logic ---
+        let selectedFiles = [];
+        let currentIndex = 0;
+        let cropper = null;
+
+        function openAddImageModal() {
+            const backdrop = document.getElementById('add-image-modal-backdrop');
+            const modal = document.getElementById('add-image-modal');
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+            // Reset state
+            resetUploadState();
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                modal.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeAddImageModal() {
+            const backdrop = document.getElementById('add-image-modal-backdrop');
+            const modal = document.getElementById('add-image-modal');
+            backdrop.classList.remove('opacity-100');
+            modal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex');
+                resetUploadState();
+            }, 300);
+        }
+
+        function resetUploadState() {
+            selectedFiles = [];
+            currentIndex = 0;
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            document.getElementById('upload-step-1').classList.remove('hidden');
+            document.getElementById('upload-step-2').classList.add('hidden');
+            document.getElementById('image-input').value = '';
+            hideError();
+        }
+
+        function hideError() {
+            const errorDiv = document.getElementById('upload-error-msg');
+            if (errorDiv) errorDiv.classList.add('hidden');
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('upload-error-msg');
+            const errorText = document.getElementById('upload-error-text');
+            if (errorDiv && errorText) {
+                errorText.textContent = msg;
+                errorDiv.classList.remove('hidden');
+            } else {
+                alert(msg); // Fallback
+            }
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            selectedFiles = Array.from(files);
+            currentIndex = 0;
+            startProcessing();
+        }
+
+        function startProcessing() {
+            if (selectedFiles.length === 0) return;
+
+            document.getElementById('upload-step-1').classList.add('hidden');
+            document.getElementById('upload-step-2').classList.remove('hidden');
+            document.getElementById('total-images-num').textContent = selectedFiles.length;
+
+            showCurrentImage();
+        }
+
+        function showCurrentImage() {
+            hideError(); // Clear previous errors
+            if (currentIndex >= selectedFiles.length) {
+                // All done
+                closeAddImageModal();
+                window.location.reload();
+                return;
+            }
+
+            document.getElementById('current-image-num').textContent = currentIndex + 1;
+            const file = selectedFiles[currentIndex];
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                const imageElement = document.getElementById('cropper-image');
+                imageElement.src = e.target.result;
+
+                // Add constraint to ensure no scrolling inside the cropper container
+                imageElement.style.maxHeight = '50vh';
+
+                if (cropper) {
+                    cropper.destroy();
+                }
+
+                // Initialize Cropper
+                cropper = new Cropper(imageElement, {
+                    viewMode: 1,
+                    dragMode: 'move',
+                    autoCropArea: 0.9, // Make crop area larger by default
+                    restore: false,
+                    guides: true,
+                    center: true,
+                    highlight: false,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: false,
+                    zoomable: false, // Disable zoom as requested
+                    scalable: false,
+                    minContainerHeight: 300,
+                });
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        async function processCurrentImage() {
+            if (!cropper) return;
+
+            const btn = document.querySelector('button[onclick="processCurrentImage()"]');
+            const btnText = document.getElementById('process-btn-text');
+            const spinner = document.getElementById('process-spinner');
+
+            hideError();
+
+            // UI Loading State
+            btn.disabled = true;
+            btnText.textContent = 'Processing...';
+            spinner.classList.remove('hidden');
+
+            try {
+                // Get cropped canvas
+                const canvas = cropper.getCroppedCanvas();
+                if (!canvas) throw new Error('Could not get cropped image');
+
+                // Convert to blob
+                canvas.toBlob(async (blob) => {
+                    const formData = new FormData();
+                    // Preserve original extension if possible or use png
+                    const originalName = selectedFiles[currentIndex].name;
+                    formData.append('file', blob, originalName);
+
+                    try {
+                        const response = await fetch('/api/upload_pass', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.error || 'Upload failed');
+                        }
+
+                        // Success notification (simple alert for now, could be toast)
+                        // alert('Flight processed successfully!');
+
+                        // Move to next
+                        nextImage();
+
+                    } catch (error) {
+                        console.error('Error uploading:', error);
+                        // Show persistent error in UI
+                        showError(`Error: ${error.message}`);
+                        // Don't auto-advance on error so user can retry or skip
+                    } finally {
+                        // Reset UI
+                        btn.disabled = false;
+                        btnText.textContent = 'Crop & Parse';
+                        spinner.classList.add('hidden');
+                    }
+                }, 'image/png');
+
+            } catch (error) {
+                console.error('Error in processing:', error);
+                showError('Failed to process image.');
+                btn.disabled = false;
+                btnText.textContent = 'Crop & Parse';
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function nextImage() {
+            currentIndex++;
+            showCurrentImage();
+        }
+
+        function skipCurrentImage() {
+            nextImage();
+        }
     </script>
 </body>
 

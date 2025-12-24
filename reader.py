@@ -36,7 +36,8 @@ def parse_boarding_pass(data_string: str) -> list[dict]:
         raise ValueError(f"Failed to parse common header data: {e}")
 
     # --- 2. Find and Parse Each Flight Leg ---
-    leg_pattern = re.compile(r"([A-Z]{8})\s+([0-9A-Z]{1,5})\s+([A-Z0-9]{12,13})")
+    # Allow alphanumeric in the first block (Origin/Dest/Carrier) to support carriers like W4, W9
+    leg_pattern = re.compile(r"([A-Z0-9]{8})\s+([0-9A-Z]{1,5})\s+([A-Z0-9]{12,13})")
     
     for match in leg_pattern.finditer(data_string):
         flight_data = common_data.copy()
@@ -132,6 +133,7 @@ def parse_boarding_pass(data_string: str) -> list[dict]:
                     break
 
     if not all_flights:
+        print(f"    [!] Raw Data: {repr(data_string)}")
         raise ValueError("Could not find any valid flight leg data in the string.")
 
     return all_flights
@@ -193,6 +195,7 @@ def process_image(image_path: str) -> list[dict] | None:
             return None
 
         res = results[0]
+        print(f"    [?] Raw Data: {repr(res.text)}")
         try:
             parsed_flights = parse_boarding_pass(res.text)
             for flight in parsed_flights:
