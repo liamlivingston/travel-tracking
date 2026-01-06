@@ -12,6 +12,7 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -59,10 +60,30 @@
             <section id="table-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-semibold text-white">All Flights ({{ flights|length }})</h2>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 flex-wrap">
                         <button onclick="openAddImageModal()"
                             class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                             Add via Image
+                        </button>
+                        <button onclick="openCameraModal()"
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Scan Pass
+                        </button>
+                        <button onclick="openRawDataModal()"
+                            class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                            </svg>
+                            Enter Raw Data
                         </button>
                         <button onclick="openAddTripModal()"
                             class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">Add
@@ -126,6 +147,17 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Source Viewer Modal (for raw data or image) -->
+    <div id="source-modal-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1002] transition-opacity duration-300"
+        onclick="closeSourceModal()">
+        <div id="source-modal"
+            class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl m-4 transform transition-all duration-300 scale-95 opacity-0 max-h-[90vh] overflow-y-auto"
+            onclick="event.stopPropagation()">
+            <!-- Modal content will be injected here -->
+        </div>
     </div>
 
     <!-- Details Modal -->
@@ -315,6 +347,39 @@
                                     class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                         </div>
+                        <div>
+                            <label for="flightera_dep_timezone"
+                                class="block text-sm font-medium text-gray-300">Departure Timezone (UTC offset)</label>
+                            <select name="dep_timezone" id="flightera_dep_timezone"
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <option value="-12:00">UTC-12:00</option>
+                                <option value="-11:00">UTC-11:00</option>
+                                <option value="-10:00">UTC-10:00 (HST)</option>
+                                <option value="-09:00">UTC-09:00 (AKST)</option>
+                                <option value="-08:00">UTC-08:00 (PST)</option>
+                                <option value="-07:00">UTC-07:00 (MST)</option>
+                                <option value="-06:00">UTC-06:00 (CST)</option>
+                                <option value="-05:00">UTC-05:00 (EST)</option>
+                                <option value="-04:00">UTC-04:00 (AST)</option>
+                                <option value="-03:00">UTC-03:00</option>
+                                <option value="-02:00">UTC-02:00</option>
+                                <option value="-01:00">UTC-01:00</option>
+                                <option value="+00:00" selected>UTC+00:00 (GMT)</option>
+                                <option value="+01:00">UTC+01:00 (CET)</option>
+                                <option value="+02:00">UTC+02:00 (EET)</option>
+                                <option value="+03:00">UTC+03:00 (MSK)</option>
+                                <option value="+04:00">UTC+04:00 (GST)</option>
+                                <option value="+05:00">UTC+05:00</option>
+                                <option value="+05:30">UTC+05:30 (IST)</option>
+                                <option value="+06:00">UTC+06:00</option>
+                                <option value="+07:00">UTC+07:00 (ICT)</option>
+                                <option value="+08:00">UTC+08:00 (SGT/HKT)</option>
+                                <option value="+09:00">UTC+09:00 (JST/KST)</option>
+                                <option value="+10:00">UTC+10:00 (AEST)</option>
+                                <option value="+11:00">UTC+11:00</option>
+                                <option value="+12:00">UTC+12:00 (NZST)</option>
+                            </select>
+                        </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label for="flightera_scheduled_arrival_time"
@@ -330,6 +395,39 @@
                                     id="flightera_actual_arrival_time"
                                     class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
+                        </div>
+                        <div>
+                            <label for="flightera_arr_timezone" class="block text-sm font-medium text-gray-300">Arrival
+                                Timezone (UTC offset)</label>
+                            <select name="arr_timezone" id="flightera_arr_timezone"
+                                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <option value="-12:00">UTC-12:00</option>
+                                <option value="-11:00">UTC-11:00</option>
+                                <option value="-10:00">UTC-10:00 (HST)</option>
+                                <option value="-09:00">UTC-09:00 (AKST)</option>
+                                <option value="-08:00">UTC-08:00 (PST)</option>
+                                <option value="-07:00">UTC-07:00 (MST)</option>
+                                <option value="-06:00">UTC-06:00 (CST)</option>
+                                <option value="-05:00">UTC-05:00 (EST)</option>
+                                <option value="-04:00">UTC-04:00 (AST)</option>
+                                <option value="-03:00">UTC-03:00</option>
+                                <option value="-02:00">UTC-02:00</option>
+                                <option value="-01:00">UTC-01:00</option>
+                                <option value="+00:00" selected>UTC+00:00 (GMT)</option>
+                                <option value="+01:00">UTC+01:00 (CET)</option>
+                                <option value="+02:00">UTC+02:00 (EET)</option>
+                                <option value="+03:00">UTC+03:00 (MSK)</option>
+                                <option value="+04:00">UTC+04:00 (GST)</option>
+                                <option value="+05:00">UTC+05:00</option>
+                                <option value="+05:30">UTC+05:30 (IST)</option>
+                                <option value="+06:00">UTC+06:00</option>
+                                <option value="+07:00">UTC+07:00 (ICT)</option>
+                                <option value="+08:00">UTC+08:00 (SGT/HKT)</option>
+                                <option value="+09:00">UTC+09:00 (JST/KST)</option>
+                                <option value="+10:00">UTC+10:00 (AEST)</option>
+                                <option value="+11:00">UTC+11:00</option>
+                                <option value="+12:00">UTC+12:00 (NZST)</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -405,6 +503,87 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300"
+        onclick="closeCameraModal()">
+        <div id="camera-modal"
+            class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0"
+            onclick="event.stopPropagation()">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-xl font-bold text-white">Scan Boarding Pass</h3>
+                    <button type="button" onclick="closeCameraModal()"
+                        class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                </div>
+                <div id="reader" width="600px" class="bg-black rounded-lg overflow-hidden"></div>
+                <p class="text-gray-400 mt-4 text-sm text-center">Point your camera at the barcode (Aztec or QR code).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Data Entry Modal -->
+    <div id="raw-data-modal-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[1000] transition-opacity duration-300"
+        onclick="closeRawDataModal()">
+        <div id="raw-data-modal"
+            class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg m-4 transform transition-all duration-300 scale-95 opacity-0"
+            onclick="event.stopPropagation()">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Enter Raw Barcode Data</h3>
+                        <p class="text-gray-400 text-sm mt-1">Paste the raw BCBP data from your external scanner.</p>
+                    </div>
+                    <button type="button" onclick="closeRawDataModal()"
+                        class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                </div>
+
+                <!-- Error Message Container -->
+                <div id="raw-data-error-msg"
+                    class="hidden mb-4 bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded relative"
+                    role="alert">
+                    <span class="block sm:inline" id="raw-data-error-text"></span>
+                </div>
+
+                <!-- Success Message Container -->
+                <div id="raw-data-success-msg"
+                    class="hidden mb-4 bg-green-900/50 border border-green-500 text-green-200 px-4 py-3 rounded relative"
+                    role="alert">
+                    <span class="block sm:inline" id="raw-data-success-text"></span>
+                </div>
+
+                <form id="raw-data-form" onsubmit="handleRawDataSubmit(event)">
+                    <div class="mb-4">
+                        <label for="raw-data-input" class="block text-sm font-medium text-gray-300 mb-2">Raw BCBP
+                            String</label>
+                        <textarea id="raw-data-input" name="raw_data" rows="6"
+                            placeholder="M1LIVINGSTON/LIAM       EUATPDLAS DL 1234 175Y018D0012 35D>..."
+                            class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-3 px-4 text-white font-mono text-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 resize-none"
+                            required></textarea>
+                        <p class="text-gray-500 text-xs mt-1">This is the raw string encoded in the barcode (Aztec,
+                            PDF417, or QR code).</p>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button type="button" onclick="closeRawDataModal()"
+                            class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                            Cancel
+                        </button>
+                        <button type="submit" id="raw-data-submit-btn"
+                            class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-md transition-colors duration-200 flex items-center">
+                            <span id="raw-data-btn-text">Process Data</span>
+                            <div id="raw-data-spinner"
+                                class="hidden ml-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin">
+                            </div>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -580,6 +759,93 @@
             });
         }
 
+        // --- Source Display Helpers ---
+        function getSourceDisplay(flight) {
+            const sourceFile = flight.source_file || 'Unknown';
+
+            // Pasted Data - clickable to show raw data
+            if (sourceFile === 'Pasted Data' && flight.raw_data) {
+                return `<span class="text-cyan-400 hover:text-cyan-300 cursor-pointer underline" onclick="event.stopPropagation(); showSourceModal('raw', '${encodeURIComponent(flight.raw_data)}', '${flight.carrier} ${flight.flight_number}')">Pasted Data</span>`;
+            }
+
+            // Camera Scan - not clickable
+            if (sourceFile === 'Camera Scan') {
+                return `<span class="text-gray-400">Camera Scan</span>`;
+            }
+
+            // Image file - clickable to show image
+            if (sourceFile.match(/\.(png|jpg|jpeg|gif|bmp|webp|tiff?)$/i)) {
+                return `<span class="text-blue-400 hover:text-blue-300 cursor-pointer underline" onclick="event.stopPropagation(); showSourceModal('image', '${sourceFile}', '${flight.carrier} ${flight.flight_number}')">${sourceFile}</span>`;
+            }
+
+            // Default - just show the text
+            return sourceFile;
+        }
+
+        function showSourceModal(type, data, flightInfo) {
+            let modalContent = '';
+
+            if (type === 'raw') {
+                const rawData = decodeURIComponent(data);
+                modalContent = `
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Raw Barcode Data</h3>
+                                <p class="text-gray-400 text-sm">${flightInfo}</p>
+                            </div>
+                            <button type="button" onclick="closeSourceModal()" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                        </div>
+                        <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                            <pre class="text-cyan-300 font-mono text-sm whitespace-pre-wrap break-all">${rawData}</pre>
+                        </div>
+                        <div class="mt-4 flex justify-end">
+                            <button onclick="navigator.clipboard.writeText('${rawData.replace(/'/g, "\\'")}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy to Clipboard', 2000)" 
+                                class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                                Copy to Clipboard
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'image') {
+                modalContent = `
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Source Image</h3>
+                                <p class="text-gray-400 text-sm">${flightInfo} - ${data}</p>
+                            </div>
+                            <button type="button" onclick="closeSourceModal()" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                        </div>
+                        <div class="bg-gray-900 rounded-lg p-2 overflow-hidden">
+                            <img src="/passes/${data}" alt="Source boarding pass" class="max-w-full h-auto rounded" onerror="this.parentElement.innerHTML='<p class=\\'text-red-400 p-4\\'>Image not found: ${data}<br><span class=\\'text-gray-400 text-sm\\'>(the source image may have been deleted)</span></p>'" />
+                        </div>
+                    </div>
+                `;
+            }
+
+            const modal = document.getElementById('source-modal');
+            const backdrop = document.getElementById('source-modal-backdrop');
+            modal.innerHTML = modalContent;
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                modal.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeSourceModal() {
+            const modal = document.getElementById('source-modal');
+            const backdrop = document.getElementById('source-modal-backdrop');
+            backdrop.classList.remove('opacity-100');
+            modal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex');
+            }, 300);
+        }
+
         // --- Details Modal ---
         function openModal(flightId) {
             const flight = flightsData.find(f => f.id === flightId);
@@ -600,7 +866,7 @@
                             <div><strong>Scheduled Date:</strong> ${flight.departure_date}</div>
                             <div><strong>Confirmation:</strong> <span class="font-mono">${flight.confirmation_number}</span></div>
                             <div><strong>Cabin:</strong> ${flight.cabin}</div>
-                            <div><strong>Source:</strong> ${flight.source_file}</div>
+                            <div><strong>Source:</strong> ${getSourceDisplay(flight)}</div>
                         </div>
                         <div class="pt-4 border-t border-gray-700">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
@@ -643,6 +909,13 @@
                                 ${flight.is_skiplagged ? 'Mark as Not Skiplagged' : 'Mark as Skiplagged'}
                             </button>
                         </div>
+                        <div class="pt-2">
+                            <button 
+                                onclick="confirmDeleteFlight('${flight.id}', '${flight.carrier} ${flight.flight_number}', '${flight.origin}', '${flight.destination}')" 
+                                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                                Delete Flight
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -666,6 +939,128 @@
                 backdrop.classList.add('hidden');
                 backdrop.classList.remove('flex');
             }, 300);
+        }
+
+        // --- Raw Data Entry Modal ---
+        function openRawDataModal() {
+            const backdrop = document.getElementById('raw-data-modal-backdrop');
+            const modal = document.getElementById('raw-data-modal');
+
+            // Reset form state
+            document.getElementById('raw-data-form').reset();
+            document.getElementById('raw-data-error-msg').classList.add('hidden');
+            document.getElementById('raw-data-success-msg').classList.add('hidden');
+
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                modal.classList.remove('scale-95', 'opacity-0');
+                document.getElementById('raw-data-input').focus();
+            }, 10);
+        }
+
+        function closeRawDataModal() {
+            const backdrop = document.getElementById('raw-data-modal-backdrop');
+            const modal = document.getElementById('raw-data-modal');
+            backdrop.classList.remove('opacity-100');
+            modal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex');
+                document.getElementById('raw-data-form').reset();
+                document.getElementById('raw-data-error-msg').classList.add('hidden');
+                document.getElementById('raw-data-success-msg').classList.add('hidden');
+            }, 300);
+        }
+
+        async function handleRawDataSubmit(event) {
+            event.preventDefault();
+
+            const rawData = document.getElementById('raw-data-input').value.trim();
+            const submitBtn = document.getElementById('raw-data-submit-btn');
+            const btnText = document.getElementById('raw-data-btn-text');
+            const spinner = document.getElementById('raw-data-spinner');
+            const errorMsg = document.getElementById('raw-data-error-msg');
+            const errorText = document.getElementById('raw-data-error-text');
+            const successMsg = document.getElementById('raw-data-success-msg');
+            const successText = document.getElementById('raw-data-success-text');
+
+            // Hide previous messages
+            errorMsg.classList.add('hidden');
+            successMsg.classList.add('hidden');
+
+            // Show loading state
+            submitBtn.disabled = true;
+            btnText.textContent = 'Processing...';
+            spinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/process_scanned_pass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ raw_data: rawData, source: 'Pasted Data' })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to process data');
+                }
+
+                if (result.success) {
+                    // Show success message briefly then reload
+                    successText.textContent = result.message || `Successfully processed ${result.flights?.length || 0} flight(s)!`;
+                    successMsg.classList.remove('hidden');
+
+                    setTimeout(() => {
+                        closeRawDataModal();
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                console.error('Error processing raw data:', error);
+                errorText.textContent = error.message;
+                errorMsg.classList.remove('hidden');
+            } finally {
+                // Reset button state
+                submitBtn.disabled = false;
+                btnText.textContent = 'Process Data';
+                spinner.classList.add('hidden');
+            }
+        }
+
+        // --- Delete Flight ---
+        async function confirmDeleteFlight(flightId, flightName, origin, destination) {
+            const confirmed = confirm(`Are you sure you want to delete ${flightName} (${origin} → ${destination})?\n\nThis action cannot be undone.`);
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch('/api/delete_flight', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: flightId })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to delete flight');
+                }
+
+                if (result.success) {
+                    closeModal();
+                    window.location.reload();
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                console.error('Error deleting flight:', error);
+                alert(`Could not delete flight: ${error.message}`);
+            }
         }
 
         // --- Add Trip Modal ---
@@ -719,18 +1114,30 @@
 
         // --- Time Formatting with Timezone ---
         function formatTimeWithTimezone(timeString) {
+            // Display time in the FLIGHT's local timezone, not the viewer's timezone
+            // Input format: "2025-12-30T06:30+01:00" or "2025-12-30T06:30"
+            if (!timeString) return 'N/A';
+
             try {
-                const date = new Date(timeString);
-                const options = {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                    timeZoneName: 'short'
-                };
-                return date.toLocaleString('en-US', options);
+                // Parse the components directly without Date conversion
+                const match = timeString.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})([+-]\d{2}:\d{2})?/);
+                if (!match) return timeString;
+
+                const [, year, month, day, hour, minute, tzOffset] = match;
+
+                // Format the date nicely
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const monthName = months[parseInt(month) - 1];
+
+                // Build display string with the flight's local time
+                let display = `${monthName} ${parseInt(day)}, ${year} ${hour}:${minute}`;
+
+                // Add timezone offset if present
+                if (tzOffset) {
+                    display += ` (UTC${tzOffset})`;
+                }
+
+                return display;
             } catch (error) {
                 return timeString;
             }
@@ -1011,6 +1418,14 @@
                     const actualDeptInput = document.getElementById('flightera_actual_departure_time');
                     const scheduledArrInput = document.getElementById('flightera_scheduled_arrival_time');
                     const actualArrInput = document.getElementById('flightera_actual_arrival_time');
+                    const depTzSelect = document.getElementById('flightera_dep_timezone');
+                    const arrTzSelect = document.getElementById('flightera_arr_timezone');
+
+                    // Extract timezone from departure times
+                    let depTimezone = extractTimezone(data.actual_departure_time) || extractTimezone(data.scheduled_departure_time);
+                    let arrTimezone = extractTimezone(data.actual_arrival_time) || extractTimezone(data.scheduled_arrival_time);
+
+                    console.log('Extracted timezones:', { dep: depTimezone, arr: arrTimezone });
 
                     if (data.scheduled_departure_time) {
                         scheduledDeptInput.value = formatTimeForInput(data.scheduled_departure_time);
@@ -1023,6 +1438,14 @@
                     }
                     if (data.actual_arrival_time) {
                         actualArrInput.value = formatTimeForInput(data.actual_arrival_time);
+                    }
+
+                    // Set timezone selects
+                    if (depTimezone) {
+                        depTzSelect.value = depTimezone;
+                    }
+                    if (arrTimezone) {
+                        arrTzSelect.value = arrTimezone;
                     }
 
                     // Show the scraped data section and enable save
@@ -1038,6 +1461,20 @@
                 scrapeBtn.textContent = 'Pull Data';
                 scrapeBtn.disabled = false;
             }
+        }
+
+        function extractTimezone(timeString) {
+            // Extract timezone offset from ISO8601 string (e.g., "+01:00" from "2025-12-30T06:30+01:00")
+            if (!timeString) return null;
+
+            // Match timezone offset at end: +HH:MM or -HH:MM
+            const match = timeString.match(/([+-]\d{2}:\d{2})$/);
+            if (match) return match[1];
+
+            // Also handle Z for UTC
+            if (timeString.endsWith('Z')) return '+00:00';
+
+            return null;
         }
 
         function formatTimeForInput(timeString) {
@@ -1065,14 +1502,26 @@
             const formData = new FormData(form);
 
             const flightId = formData.get('flight_id');
+            const depTimezone = formData.get('dep_timezone') || '+00:00';
+            const arrTimezone = formData.get('arr_timezone') || '+00:00';
+
+            // Helper to append timezone to datetime-local value
+            function addTimezone(timeValue, timezone) {
+                if (!timeValue) return null;
+                // datetime-local format is YYYY-MM-DDTHH:MM, append timezone
+                return `${timeValue}${timezone}`;
+            }
+
             const updateData = {
                 id: flightId,
                 flightera_link: formData.get('flightera_link'),
-                scheduled_departure_time: formData.get('scheduled_departure_time') || null,
-                actual_departure_time: formData.get('actual_departure_time') || null,
-                scheduled_arrival_time: formData.get('scheduled_arrival_time') || null,
-                actual_arrival_time: formData.get('actual_arrival_time') || null
+                scheduled_departure_time: addTimezone(formData.get('scheduled_departure_time'), depTimezone),
+                actual_departure_time: addTimezone(formData.get('actual_departure_time'), depTimezone),
+                scheduled_arrival_time: addTimezone(formData.get('scheduled_arrival_time'), arrTimezone),
+                actual_arrival_time: addTimezone(formData.get('actual_arrival_time'), arrTimezone)
             };
+
+            console.log('Submitting flight update with timezones:', updateData);
 
             try {
                 const response = await fetch('/api/update_flight', {
@@ -1306,6 +1755,121 @@
             nextImage();
         }
     </script>
+
+
+    <script>
+        // --- Camera Scanning ---
+        let html5QrcodeScanner;
+
+        function openCameraModal() {
+            const backdrop = document.getElementById('camera-modal-backdrop');
+            const modal = document.getElementById('camera-modal');
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                modal.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+
+            // Initialize scanner with Aztec support
+            // Note: html5-qrcode's scanner UI handles permission request
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader",
+                    {
+                        fps: 10,
+                        // Increase resolution for better barcode reading (PDF417/Aztec are dense)
+                        videoConstraints: {
+                            facingMode: "environment",
+                            width: { min: 640, ideal: 1920, max: 2560 },
+                            height: { min: 480, ideal: 1080, max: 1440 }
+                        },
+                        // Make scanning box larger and responsive
+                        qrbox: function (viewfinderWidth, viewfinderHeight) {
+                            return {
+                                width: Math.floor(viewfinderWidth * 0.8),
+                                height: Math.floor(viewfinderHeight * 0.6)
+                            };
+                        },
+                        rememberLastUsedCamera: true,
+                        // Enable native barcode detector if available
+                        experimentalFeatures: {
+                            useBarCodeDetectorIfSupported: true
+                        },
+                        formatsToSupport: [
+                            Html5QrcodeSupportedFormats.AZTEC,
+                            Html5QrcodeSupportedFormats.QR_CODE,
+                            Html5QrcodeSupportedFormats.PDF_417
+                        ]
+                    },
+                    /* verbose= */ false);
+            }
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+
+        function closeCameraModal() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear().catch(error => {
+                    console.error("Failed to clear html5QrcodeScanner. ", error);
+                });
+            }
+
+            const backdrop = document.getElementById('camera-modal-backdrop');
+            const modal = document.getElementById('camera-modal');
+            backdrop.classList.remove('opacity-100');
+            modal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                backdrop.classList.remove('flex');
+            }, 300);
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log("DEBUG: Scan Success!");
+            console.log("DEBUG: decodedText:", decodedText);
+            console.log("DEBUG: decodedResult:", JSON.stringify(decodedResult, null, 2));
+
+            // Stop scanning immediately
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.pause(true);
+            }
+
+            // Send to backend
+            fetch('/api/process_scanned_pass', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ raw_data: decodedText })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        closeCameraModal();
+                        // Show success message or toast
+                        alert(`Successfully scanned pass for ${data.flights[0].passenger_name}!\nAdded ${data.flights.length} flight(s).`);
+                        window.location.reload();
+                    } else {
+                        alert(`Error processing pass: ${data.error}`);
+                        // Resume scanning if failed
+                        if (html5QrcodeScanner) {
+                            html5QrcodeScanner.resume();
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Network error processing pass.");
+                    if (html5QrcodeScanner) {
+                        html5QrcodeScanner.resume();
+                    }
+                });
+        }
+
+        function onScanFailure(error) {
+            // handle scan failure, usually better to ignore and keep scanning.
+            // console.warn(`Code scan error = ${error}`);
+        }
+    </script>
 </body>
 
 </html>
+```

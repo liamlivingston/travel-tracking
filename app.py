@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 import json
 import os
 from datetime import datetime
@@ -8,7 +8,7 @@ import re
 import pytz
 from urllib.parse import urlparse
 import time
-from reader import process_image
+from reader import process_image, parse_boarding_pass, update_flight_database
 import tempfile
 import random
 
@@ -69,8 +69,19 @@ def dashboard():
         
         enriched_flights.append(flight)
 
-    # Sort flights by departure date, most recent first
-    enriched_flights.sort(key=lambda x: x.get('departure_date') or '0000-00-00', reverse=True)
+    # Sort flights by departure time (most recent first)
+    # Use scheduled_departure_time for proper ordering, fall back to date
+    def get_sort_key(flight):
+        # Try scheduled_departure_time first (includes time for proper ordering)
+        dep_time = flight.get('scheduled_departure_time')
+        if dep_time:
+            # Remove timezone info for consistent sorting
+            # Format could be: "2025-12-30T06:30+01:00" or "2025-12-30T06:30"
+            return dep_time[:16] if len(dep_time) >= 16 else dep_time
+        # Fall back to date
+        return flight.get('departure_date') or '0000-00-00'
+    
+    enriched_flights.sort(key=get_sort_key, reverse=True)
         
     return render_template('index.html', flights=enriched_flights)
 
@@ -104,6 +115,32 @@ def toggle_skiplag():
     save_json_data(flights, PASS_DATA_FILE)
     
     return jsonify({"success": True, "new_status": flight['is_skiplagged']})
+
+@app.route('/api/delete_flight', methods=['POST'])
+def delete_flight():
+    """API endpoint to delete a flight."""
+    data = request.get_json()
+    flight_id_to_delete = data.get('id')
+
+    if not flight_id_to_delete:
+        return jsonify({"success": False, "error": "Flight ID is missing"}), 400
+
+    # Load the current flight data
+    flights = load_json_data(PASS_DATA_FILE)
+    
+    # Find and remove the flight
+    original_length = len(flights)
+    flights = [f for f in flights if not (
+        f"{f.get('confirmation_number')}-{f.get('flight_number')}-{extract_date_from_datetime(f.get('scheduled_departure_time')) or f.get('scheduled_departure_date') or 'unknown'}" == flight_id_to_delete
+    )]
+    
+    if len(flights) == original_length:
+        return jsonify({"success": False, "error": "Flight not found"}), 404
+
+    # Save the modified data back to the file
+    save_json_data(flights, PASS_DATA_FILE)
+    
+    return jsonify({"success": True, "message": "Flight deleted successfully"})
 
 @app.route('/api/add_flight', methods=['POST'])
 def add_flight():
@@ -432,22 +469,33 @@ def scrape_flightera_data(url):
                         departure_date = f"{year}-{months[month]}-{day.zfill(2)}"
                         print(f"Debug: Found departure date: {departure_date}")
             
-            # Look for arrival date in structured data (JSON-LD)
+            # Look for scheduled times and dates in structured data (JSON-LD)
+            # These times are in UTC format (e.g., "2023-07-22T17:00:00Z")
+            json_ld_scheduled_departure_utc = None
+            json_ld_scheduled_arrival_utc = None
             json_ld_scripts = soup.find_all('script', type='application/ld+json')
             for script in json_ld_scripts:
                 try:
                     import json
                     data = json.loads(script.string)
                     if isinstance(data, dict) and data.get('@type') == 'Flight':
-                        arrival_time = data.get('arrivalTime')
-                        if arrival_time:
-                            # Parse ISO datetime (e.g., "2023-07-22T17:00:00Z")
-                            arrival_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', arrival_time)
+                        # Extract scheduled departure time in UTC
+                        dep_time_utc = data.get('departureTime')
+                        if dep_time_utc:
+                            json_ld_scheduled_departure_utc = dep_time_utc
+                            print(f"Debug: Found scheduled departure UTC from JSON-LD: {dep_time_utc}")
+                        
+                        # Extract scheduled arrival time in UTC
+                        arr_time_utc = data.get('arrivalTime')
+                        if arr_time_utc:
+                            json_ld_scheduled_arrival_utc = arr_time_utc
+                            # Also extract arrival date
+                            arrival_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', arr_time_utc)
                             if arrival_match:
                                 year, month, day = arrival_match.groups()
                                 arrival_date = f"{year}-{month}-{day}"
                                 print(f"Debug: Found arrival date from JSON-LD: {arrival_date}")
-                                break
+                        break
                 except (json.JSONDecodeError, AttributeError):
                     continue
             
@@ -517,73 +565,194 @@ def scrape_flightera_data(url):
                                 print(f"Debug: Found destination airport from fallback: {flight_data['destination']}")
                                 break
 
-            # Look for actual departure time (in main time display)
+            # Helper function to calculate timezone offset from local and UTC time
+            def calculate_tz_offset(local_time_str, utc_time_str):
+                """Calculate timezone offset string like '+01:00' from local and UTC times"""
+                try:
+                    local_h, local_m = map(int, local_time_str.split(':'))
+                    utc_h, utc_m = map(int, utc_time_str.split(':'))
+                    local_minutes = local_h * 60 + local_m
+                    utc_minutes = utc_h * 60 + utc_m
+                    diff_minutes = local_minutes - utc_minutes
+                    # Handle day wrap-around
+                    if diff_minutes > 720:  # More than +12 hours
+                        diff_minutes -= 1440
+                    elif diff_minutes < -720:  # Less than -12 hours
+                        diff_minutes += 1440
+                    sign = '+' if diff_minutes >= 0 else '-'
+                    diff_minutes = abs(diff_minutes)
+                    offset_h = diff_minutes // 60
+                    offset_m = diff_minutes % 60
+                    return f"{sign}{offset_h:02d}:{offset_m:02d}"
+                except:
+                    return None
+
+            # Helper to find UTC time text near a time element
+            def find_utc_time_in_container(container):
+                """Find UTC time like '05:48 UTC' in a container's text"""
+                if not container:
+                    return None
+                container_text = container.get_text()
+                utc_match = re.search(r'(\d{1,2}:\d{2})\s*UTC', container_text)
+                if utc_match:
+                    return utc_match.group(1)
+                return None
+
+            # Look for actual departure time with UTC time for proper timezone
             dep_time_elem = soup.find('div', {'id': 'depTimeLiveHB'})
+            dep_utc_time = None
+            dep_local_time = None
             if dep_time_elem:
                 time_text = dep_time_elem.get_text(strip=True)
                 time_match = re.search(r'(\d{1,2}:\d{2})', time_text)
                 if time_match:
-                    time_str = time_match.group(1)
-                    if departure_date:
-                        flight_data['actual_departure_time'] = f"{departure_date}T{time_str}"
+                    dep_local_time = time_match.group(1)
+                    
+                # Find UTC time in the parent container (usually in text-xs div below)
+                dep_container = dep_time_elem.find_parent()
+                if dep_container:
+                    dep_utc_time = find_utc_time_in_container(dep_container)
+                    
+                # Calculate timezone offset if we have both local and UTC
+                if dep_local_time and dep_utc_time and departure_date:
+                    tz_offset = calculate_tz_offset(dep_local_time, dep_utc_time)
+                    if tz_offset:
+                        flight_data['actual_departure_time'] = f"{departure_date}T{dep_local_time}{tz_offset}"
                     else:
-                        flight_data['actual_departure_time'] = time_str
-                    print(f"Debug: Found actual departure time: {flight_data['actual_departure_time']}")
+                        flight_data['actual_departure_time'] = f"{departure_date}T{dep_local_time}"
+                elif dep_local_time and departure_date:
+                    flight_data['actual_departure_time'] = f"{departure_date}T{dep_local_time}"
+                print(f"Debug: Found actual departure: local={dep_local_time}, UTC={dep_utc_time}, result={flight_data.get('actual_departure_time')}")
                 
-                # Extract departure timezone
+                # Extract departure timezone name (for reference)
                 timezone_span = dep_time_elem.find('span', class_='text-xs')
                 if timezone_span:
                     timezone = timezone_span.get_text(strip=True)
                     flight_data['departure_timezone'] = timezone
                     print(f"Debug: Found departure timezone: {timezone}")
             
-            # Look for actual arrival time (in main time display)
+            # Look for actual arrival time with UTC time for proper timezone
             arr_time_elem = soup.find('div', {'id': 'arrTimeLiveHB'})
+            arr_utc_time = None
+            arr_local_time = None
             if arr_time_elem:
                 time_text = arr_time_elem.get_text(strip=True)
                 time_match = re.search(r'(\d{1,2}:\d{2})', time_text)
                 if time_match:
-                    time_str = time_match.group(1)
-                    if arrival_date:
-                        flight_data['actual_arrival_time'] = f"{arrival_date}T{time_str}"
+                    arr_local_time = time_match.group(1)
+                    
+                # Find UTC time in the parent container
+                arr_container = arr_time_elem.find_parent()
+                if arr_container:
+                    arr_utc_time = find_utc_time_in_container(arr_container)
+                    
+                # Calculate timezone offset if we have both local and UTC
+                if arr_local_time and arr_utc_time and arrival_date:
+                    tz_offset = calculate_tz_offset(arr_local_time, arr_utc_time)
+                    if tz_offset:
+                        flight_data['actual_arrival_time'] = f"{arrival_date}T{arr_local_time}{tz_offset}"
                     else:
-                        flight_data['actual_arrival_time'] = time_str
-                    print(f"Debug: Found actual arrival time: {flight_data['actual_arrival_time']}")
+                        flight_data['actual_arrival_time'] = f"{arrival_date}T{arr_local_time}"
+                elif arr_local_time and arrival_date:
+                    flight_data['actual_arrival_time'] = f"{arrival_date}T{arr_local_time}"
+                print(f"Debug: Found actual arrival: local={arr_local_time}, UTC={arr_utc_time}, result={flight_data.get('actual_arrival_time')}")
                 
-                # Extract arrival timezone
+                # Extract arrival timezone name (for reference)
                 timezone_span = arr_time_elem.find('span', class_='text-xs')
                 if timezone_span:
                     timezone = timezone_span.get_text(strip=True)
                     flight_data['arrival_timezone'] = timezone
                     print(f"Debug: Found arrival timezone: {timezone}")
             
-            # Look for scheduled departure time (in strikethrough)
-            dep_section = soup.find('div', string='DEPARTURE')
-            if dep_section:
-                dep_container = dep_section.find_parent()
-                if dep_container:
-                    strikethrough = dep_container.find('span', class_='line-through')
-                    if strikethrough:
-                        scheduled_time = strikethrough.get_text(strip=True)
-                        if departure_date:
-                            flight_data['scheduled_departure_time'] = f"{departure_date}T{scheduled_time}"
-                        else:
-                            flight_data['scheduled_departure_time'] = scheduled_time
-                        print(f"Debug: Found scheduled departure time: {flight_data['scheduled_departure_time']}")
+            # Use JSON-LD UTC times for scheduled times (most reliable)
+            # These are in format "2025-12-30T05:30:00Z" - convert to local with offset
+            if json_ld_scheduled_departure_utc:
+                # Parse the UTC time
+                utc_match = re.search(r'(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})', json_ld_scheduled_departure_utc)
+                if utc_match:
+                    utc_date_str = utc_match.group(1)
+                    utc_time_str = utc_match.group(2)
+                    # If we have the offset from actual departure, use it for scheduled too
+                    if dep_local_time and dep_utc_time:
+                        tz_offset = calculate_tz_offset(dep_local_time, dep_utc_time)
+                        if tz_offset:
+                            # Convert UTC to local using the offset
+                            from datetime import datetime, timedelta
+                            utc_dt = datetime.fromisoformat(f"{utc_date_str}T{utc_time_str}:00")
+                            # Parse offset to minutes
+                            sign = 1 if tz_offset[0] == '+' else -1
+                            off_h, off_m = map(int, tz_offset[1:].split(':'))
+                            offset_minutes = sign * (off_h * 60 + off_m)
+                            local_dt = utc_dt + timedelta(minutes=offset_minutes)
+                            flight_data['scheduled_departure_time'] = f"{local_dt.strftime('%Y-%m-%dT%H:%M')}{tz_offset}"
+                            print(f"Debug: Scheduled departure from JSON-LD: {flight_data['scheduled_departure_time']}")
+                    else:
+                        # Store as UTC if no offset known
+                        flight_data['scheduled_departure_time'] = json_ld_scheduled_departure_utc.replace('Z', '+00:00')
+                        print(f"Debug: Scheduled departure (UTC): {flight_data['scheduled_departure_time']}")
+            else:
+                # Fallback: Look for scheduled departure time (in strikethrough)
+                dep_section = soup.find('div', string='DEPARTURE')
+                if dep_section:
+                    dep_container = dep_section.find_parent()
+                    if dep_container:
+                        strikethrough = dep_container.find('span', class_='line-through')
+                        if strikethrough:
+                            scheduled_time = strikethrough.get_text(strip=True)
+                            # Use same offset as actual departure if available
+                            if dep_utc_time and dep_local_time and departure_date:
+                                tz_offset = calculate_tz_offset(dep_local_time, dep_utc_time)
+                                if tz_offset:
+                                    flight_data['scheduled_departure_time'] = f"{departure_date}T{scheduled_time}{tz_offset}"
+                                else:
+                                    flight_data['scheduled_departure_time'] = f"{departure_date}T{scheduled_time}"
+                            elif departure_date:
+                                flight_data['scheduled_departure_time'] = f"{departure_date}T{scheduled_time}"
+                            print(f"Debug: Found scheduled departure time from strikethrough: {flight_data.get('scheduled_departure_time')}")
             
-            # Look for scheduled arrival time (in strikethrough)
-            arr_section = soup.find('div', string='ARRIVAL')
-            if arr_section:
-                arr_container = arr_section.find_parent()
-                if arr_container:
-                    strikethrough = arr_container.find('span', class_='line-through')
-                    if strikethrough:
-                        scheduled_time = strikethrough.get_text(strip=True)
-                        if arrival_date:
-                            flight_data['scheduled_arrival_time'] = f"{arrival_date}T{scheduled_time}"
-                        else:
-                            flight_data['scheduled_arrival_time'] = scheduled_time
-                        print(f"Debug: Found scheduled arrival time: {flight_data['scheduled_arrival_time']}")
+            if json_ld_scheduled_arrival_utc:
+                # Parse the UTC time
+                utc_match = re.search(r'(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})', json_ld_scheduled_arrival_utc)
+                if utc_match:
+                    utc_date_str = utc_match.group(1)
+                    utc_time_str = utc_match.group(2)
+                    # If we have the offset from actual arrival, use it for scheduled too
+                    if arr_local_time and arr_utc_time:
+                        tz_offset = calculate_tz_offset(arr_local_time, arr_utc_time)
+                        if tz_offset:
+                            # Convert UTC to local using the offset
+                            from datetime import datetime, timedelta
+                            utc_dt = datetime.fromisoformat(f"{utc_date_str}T{utc_time_str}:00")
+                            # Parse offset to minutes
+                            sign = 1 if tz_offset[0] == '+' else -1
+                            off_h, off_m = map(int, tz_offset[1:].split(':'))
+                            offset_minutes = sign * (off_h * 60 + off_m)
+                            local_dt = utc_dt + timedelta(minutes=offset_minutes)
+                            flight_data['scheduled_arrival_time'] = f"{local_dt.strftime('%Y-%m-%dT%H:%M')}{tz_offset}"
+                            print(f"Debug: Scheduled arrival from JSON-LD: {flight_data['scheduled_arrival_time']}")
+                    else:
+                        # Store as UTC if no offset known
+                        flight_data['scheduled_arrival_time'] = json_ld_scheduled_arrival_utc.replace('Z', '+00:00')
+                        print(f"Debug: Scheduled arrival (UTC): {flight_data['scheduled_arrival_time']}")
+            else:
+                # Fallback: Look for scheduled arrival time (in strikethrough)
+                arr_section = soup.find('div', string='ARRIVAL')
+                if arr_section:
+                    arr_container = arr_section.find_parent()
+                    if arr_container:
+                        strikethrough = arr_container.find('span', class_='line-through')
+                        if strikethrough:
+                            scheduled_time = strikethrough.get_text(strip=True)
+                            # Use same offset as actual arrival if available
+                            if arr_utc_time and arr_local_time and arrival_date:
+                                tz_offset = calculate_tz_offset(arr_local_time, arr_utc_time)
+                                if tz_offset:
+                                    flight_data['scheduled_arrival_time'] = f"{arrival_date}T{scheduled_time}{tz_offset}"
+                                else:
+                                    flight_data['scheduled_arrival_time'] = f"{arrival_date}T{scheduled_time}"
+                            elif arrival_date:
+                                flight_data['scheduled_arrival_time'] = f"{arrival_date}T{scheduled_time}"
+                            print(f"Debug: Found scheduled arrival time from strikethrough: {flight_data.get('scheduled_arrival_time')}")
             
             # Extract delay information
             dep_delay_elem = soup.find('span', {'id': 'depDelHB'})
@@ -657,6 +826,11 @@ def scrape_flightera():
     except Exception as e:
         return jsonify({"success": False, "error": f"Parsing error: {str(e)}"}), 500
 
+@app.route('/passes/<path:filename>')
+def serve_pass_image(filename):
+    """Serve boarding pass images from the passes directory."""
+    return send_from_directory('passes', filename)
+
 import subprocess
 import sys
 
@@ -708,6 +882,46 @@ def upload_pass():
             return jsonify({"success": False, "error": str(e)}), 500
 
     return jsonify({"success": False, "error": "Unknown error"}), 500
+
+@app.route('/api/process_scanned_pass', methods=['POST'])
+def process_scanned_pass():
+    """API endpoint to process raw BCBP data scanned from the frontend."""
+    data = request.get_json()
+    print(f"DEBUG: Received data: {data}") # Log the specific data received
+    raw_data = data.get('raw_data')
+    source = data.get('source', 'Camera Scan')  # Default to Camera Scan for backwards compatibility
+    
+    if not raw_data:
+        print("DEBUG: raw_data is missing or empty")
+        return jsonify({"success": False, "error": "No data provided", "received": data}), 400
+        
+    try:
+        # Parse the raw string
+        print(f"DEBUG: Processing raw_data: {repr(raw_data)}")
+        flights = parse_boarding_pass(raw_data)
+        
+        # Add source info
+        for flight in flights:
+            flight['source_file'] = source
+            # Store raw data for pasted entries so it can be viewed later
+            if source == 'Pasted Data':
+                flight['raw_data'] = raw_data
+            
+        # Update the database
+        # We pass an empty set for processed_files_list so it doesn't remove any existing file-based flights
+        update_flight_database(flights, processed_files_list=set())
+        
+        return jsonify({
+            "success": True,
+            "message": f"Successfully processed {len(flights)} flight(s).",
+            "flights": flights
+        })
+        
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        print(f"Error processing scanned pass: {e}")
+        return jsonify({"success": False, "error": f"Processing failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

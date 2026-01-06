@@ -72,18 +72,12 @@ def parse_boarding_pass(data_string: str) -> list[dict]:
             # NOT next year (2026).
             # --- END CHANGE ---
             
-            # Extract departure time from details block if available (positions 9-12 for HHMM format)
-            departure_time_str = details_block[9:13] if len(details_block) >= 13 else "0000"
-            try:
-                hours = int(departure_time_str[:2])
-                minutes = int(departure_time_str[2:4])
-                departure_datetime = departure_date.replace(hour=hours, minute=minutes)
-                flight_data['scheduled_departure_time'] = departure_datetime.isoformat()
-            except (ValueError, IndexError):
-                flight_data['scheduled_departure_time'] = departure_date.isoformat()
+            # Note: BCBP mandatory section does NOT contain departure time.
+            # The time is in the conditional section (after '>') which varies by airline.
+            # We set the date only; actual times should be populated via Flightera or manual entry.
+            flight_data['scheduled_departure_time'] = departure_date.isoformat()
             
-            # Extract arrival time if available (typically in conditional section or extended data)
-            # For now, set as None - will be populated from conditional data if available
+            # These will be populated from Flightera or manual entry
             flight_data['scheduled_arrival_time'] = None
             flight_data['actual_departure_time'] = None
             flight_data['actual_arrival_time'] = None
@@ -135,6 +129,47 @@ def parse_boarding_pass(data_string: str) -> list[dict]:
     if not all_flights:
         print(f"    [!] Raw Data: {repr(data_string)}")
         raise ValueError("Could not find any valid flight leg data in the string.")
+
+    # --- Sort multi-leg flights in correct order ---
+    # Build a chain where destination of one flight matches origin of next (A→B, B→C)
+    if len(all_flights) > 1:
+        sorted_flights = []
+        remaining = all_flights.copy()
+        
+        # Find the starting flight (origin not matching any destination)
+        all_destinations = {f['destination'] for f in all_flights}
+        starting_flight = None
+        for flight in remaining:
+            if flight['origin'] not in all_destinations:
+                starting_flight = flight
+                break
+        
+        # If no clear starting flight found, use the first one
+        if starting_flight is None:
+            starting_flight = remaining[0]
+        
+        sorted_flights.append(starting_flight)
+        remaining.remove(starting_flight)
+        
+        # Build the chain by matching destination to next origin
+        while remaining:
+            current_dest = sorted_flights[-1]['destination']
+            next_flight = None
+            for flight in remaining:
+                if flight['origin'] == current_dest:
+                    next_flight = flight
+                    break
+            
+            if next_flight:
+                sorted_flights.append(next_flight)
+                remaining.remove(next_flight)
+            else:
+                # No connecting flight found, append remaining flights
+                sorted_flights.extend(remaining)
+                break
+        
+        all_flights = sorted_flights
+        print(f"    [i] Sorted {len(all_flights)} legs: {' → '.join([f['origin'] for f in all_flights] + [all_flights[-1]['destination']])}")
 
     return all_flights
 
@@ -191,8 +226,41 @@ def process_image(image_path: str) -> list[dict] | None:
 
         results = zxingcpp.read_barcodes(img)
         if not results:
-            print(f"    [!] No Aztec code detected in {os.path.basename(image_path)}.")
-            return None
+            # Retry with high-contrast black & white image
+            print(f"    [?] No codes found, retrying with B&W enhancement...")
+            
+            # Convert to grayscale
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+            # Apply contrast enhancement - darken the blacks significantly
+            # Using a lookup table to remap pixel values
+            # This creates a curve that pushes dark values darker
+            lookup_table = []
+            for i in range(256):
+                # Apply gamma correction with gamma < 1 to darken midtones/shadows
+                # Then apply additional contrast boost
+                normalized = i / 255.0
+                # Gamma of 0.5 darkens significantly
+                darkened = pow(normalized, 0.5) * 255
+                # Boost contrast by stretching the histogram
+                contrasted = int(max(0, min(255, (darkened - 64) * 1.5 + 64)))
+                lookup_table.append(contrasted)
+            
+            lookup_table = bytearray(lookup_table)
+            import numpy as np
+            lut = np.array(lookup_table, dtype=np.uint8)
+            enhanced = cv2.LUT(gray, lut)
+            
+            # Apply adaptive thresholding for better barcode detection
+            binary = cv2.adaptiveThreshold(
+                enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                cv2.THRESH_BINARY, 21, 5
+            )
+            
+            results = zxingcpp.read_barcodes(binary)
+            if not results:
+                print(f"    [!] No codes found in {os.path.basename(image_path)}.")
+                return None
 
         res = results[0]
         print(f"    [?] Raw Data: {repr(res.text)}")
@@ -263,42 +331,61 @@ def main():
         print(f"  - {os.path.basename(img_file)}")
     print()
     
+    # Combine preserved flights with newly parsed flights
+    update_flight_database(all_passes_data, processed_files_list=processed_files)
+
+def update_flight_database(new_flights: list[dict], processed_files_list: set = None) -> None:
+    """
+    Updates the boarding_passes.json file with new flight data,
+    preserving existing manual edits and merging intelligently.
+    """
+    output_json_file = 'boarding_passes.json'
+    
+    if processed_files_list is None:
+        processed_files_list = set()
+        
+    # Load existing data
+    existing_data = []
+    if os.path.exists(output_json_file):
+        with open(output_json_file, 'r') as f:
+            try:
+                existing_data = json.load(f)
+            except json.JSONDecodeError:
+                print(f"Warning: Could not read '{output_json_file}'. File might be corrupt. Starting fresh.")
+                existing_data = []
+
     # Keep existing flights that are NOT from files being re-processed
+    # If processed_files_list is empty (e.g. from live scan), we assume we keep everything 
+    # unless the specific flight ID matches (which is handled in the merge step)
+    # BUT, the original logic removed ALL flights from a source file if that file was being re-processed.
+    # For live scanning, source_file might be "Camera Scan" or similar.
+    
     preserved_flights = [
         flight for flight in existing_data 
-        if flight.get('source_file') not in processed_files
+        if flight.get('source_file') not in processed_files_list
     ]
     
     # Create lookup for existing flights to preserve skiplag status and other manual changes
     existing_lookup = {}
     for flight in existing_data:
-        # --- START CHANGE (Robust Merge Key) ---
-        # We now use a key based on data *only* from the pass,
-        # not the "guessed" year, to make matching robust.
+        # We now use a key based on data *only* from the pass
         key = f"{flight.get('confirmation_number')}-{flight.get('flight_number')}-{flight.get('julian_date')}"
-        # --- END CHANGE ---
         
-        if flight.get('julian_date'): # Only add flights that have a valid key
+        if flight.get('julian_date'): 
             existing_lookup[key] = flight
     
     # Apply existing data to newly parsed flights
-    for new_flight in all_passes_data:
-        # --- START CHANGE (Robust Merge Key) ---
-        # Use the same robust key to look up the new flight
+    for new_flight in new_flights:
         key = f"{new_flight.get('confirmation_number')}-{new_flight.get('flight_number')}-{new_flight.get('julian_date')}"
-        # --- END CHANGE ---
         
         if key in existing_lookup:
             existing_flight = existing_lookup[key]
             
-            # --- START CHANGE (Preserve Existing Dates) ---
-            # If a flight already exists, trust its dates,
-            # especially if they were manually corrected in the JSON.
+            # Preserve Existing Dates
             if existing_flight.get('scheduled_departure_time'):
                 new_flight['scheduled_departure_time'] = existing_flight['scheduled_departure_time']
             if existing_flight.get('scheduled_departure_date'):
                 new_flight['scheduled_departure_date'] = existing_flight['scheduled_departure_date']
-            # --- END CHANGE ---
 
             # Preserve other manual fields
             new_flight['is_skiplagged'] = existing_flight.get('is_skiplagged', False)
@@ -312,15 +399,12 @@ def main():
                 new_flight['actual_arrival_time'] = existing_flight['actual_arrival_time']
     
     # Combine preserved flights with newly parsed flights
-    final_data = preserved_flights + all_passes_data
-
+    final_data = preserved_flights + new_flights
 
     with open(output_json_file, 'w') as f:
         json.dump(final_data, f, indent=4, sort_keys=True)
         
-    print(f"\n✅ Done! Processed {len(image_files)} image files.")
-    print(f"Found {len(all_passes_data)} new flight legs from images.")
-    print(f"Preserved {len(preserved_flights)} existing flights.")
+    print(f"\n✅ Database updated.")
     print(f"Total flights in database: {len(final_data)}.")
     print(f"Combined data saved to '{output_json_file}'")
 
