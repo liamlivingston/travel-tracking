@@ -1508,5 +1508,25 @@
         "sequence_number": 28,
         "source_file": "PXL_20251225_095533814.RAW-01.COVER.jpg",
         "ticket_number": "0552112988744"
+    },
+    {
+        "actual_arrival_time": "",
+        "actual_departure_time": "",
+        "cabin": "Economy",
+        "carrier": "AT",
+        "confirmation_number": "",
+        "destination": "RAK",
+        "eticket_indicator": "E",
+        "flight_number": "673",
+        "flightera_link": "",
+        "is_skiplagged": false,
+        "julian_date": "000",
+        "origin": "LHR",
+        "passenger_name": "LIVINGSTON/LIAM",
+        "scheduled_arrival_time": "",
+        "scheduled_departure_time": "2010-12-15T12:59",
+        "seat_number": "",
+        "sequence_number": 999,
+        "source_file": "Manual Entry"
     }
 ]
